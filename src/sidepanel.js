@@ -304,6 +304,7 @@ function renderList(el, list, { deadline = false } = {}) {
 // ---------- readiness ----------
 // You type what the quiz covers; we find those materials and score how ready you are.
 const editingCoverage = new Set();
+const openChecklists = new Set();
 const coverageDrafts = new Map();
 
 function readinessBlock(dl) {
@@ -358,25 +359,65 @@ function readinessBlock(dl) {
   const h = Math.floor(r.minutesLeft / 60), m = r.minutesLeft % 60;
   line.textContent = `${r.score}% ready · ${h ? h + "h " : ""}${m}m left to study · ${label}`;
 
-  const cov = document.createElement("div");
-  cov.className = "meta";
-  cov.textContent = "Covers: " + covered.map((x) => x.title).join(", ");
+  // Checklist: what this quiz covers, done vs. left. Tick right here.
+  const doneCount = covered.filter((x) => x.done).length;
+  const toggle = document.createElement("a");
+  toggle.href = "#";
+  toggle.className = "meta";
+  const open = openChecklists.has(dl.id);
+  toggle.textContent = `${open ? "▾" : "▸"} Checklist: ${doneCount}/${covered.length} done`;
+  toggle.addEventListener("click", (e) => {
+    e.preventDefault();
+    open ? openChecklists.delete(dl.id) : openChecklists.add(dl.id);
+    render();
+  });
   const edit = document.createElement("a");
   edit.href = "#";
-  edit.textContent = " (edit)";
+  edit.className = "meta";
+  edit.textContent = "  · edit what it covers";
   edit.addEventListener("click", (e) => {
     e.preventDefault();
     editingCoverage.add(dl.id);
     render();
   });
-  cov.append(edit);
+  const head = document.createElement("div");
+  head.append(toggle, edit);
+  wrap.append(bar, line, head);
 
-  wrap.append(bar, line, cov);
-  if (r.notOpened.length) {
-    const warn = document.createElement("div");
-    warn.className = "meta warn";
-    warn.textContent = "Not opened yet: " + r.notOpened.map((x) => x.title).join(", ");
-    wrap.append(warn);
+  if (open) {
+    const ul = document.createElement("ul");
+    ul.className = "checklist";
+    // Left first, then done.
+    for (const c of [...covered].sort((a, b) => a.done - b.done)) {
+      const li = document.createElement("li");
+      if (c.done) li.classList.add("done");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = c.done;
+      box.addEventListener("change", async () => {
+        c.done = box.checked;
+        await save();
+        render();
+      });
+      const name = document.createElement("a");
+      name.href = "#";
+      name.className = "title";
+      name.textContent = c.title;
+      name.addEventListener("click", async (e) => {
+        e.preventDefault();
+        if (c.localFile) {
+          const blob = await getFile(c.localFile);
+          if (blob) chrome.tabs.create({ url: URL.createObjectURL(blob) });
+        } else if (c.link) chrome.tabs.create({ url: c.link });
+      });
+      const info = document.createElement("span");
+      info.className = "meta";
+      const bits = [c.minutes ? `~${c.minutes} min` : null, !c.opened && !c.done ? "not opened" : null];
+      info.textContent = bits.filter(Boolean).length ? "  " + bits.filter(Boolean).join(" · ") : "";
+      li.append(box, name, info);
+      ul.append(li);
+    }
+    wrap.append(ul);
   }
   return wrap;
 }
