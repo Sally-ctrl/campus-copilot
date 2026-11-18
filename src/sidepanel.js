@@ -12,6 +12,12 @@ let courseFilter = "ALL";
 async function load() {
   const data = await chrome.storage.local.get(["items", "group"]);
   items = data.items ?? [];
+  // Old "busy" failures weren't the lecture's fault: let them be retried.
+  for (const x of items) {
+    if (x.summaryError && /429|busy|high demand|overloaded|quota|rate|All cloud models failed/i.test(x.summaryError)) {
+      delete x.summaryError;
+    }
+  }
   group = data.group ?? "";
   $("groupInput").value = group;
   render();
