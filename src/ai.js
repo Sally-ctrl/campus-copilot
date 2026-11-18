@@ -29,10 +29,32 @@ export const model = getGenerativeModel(ai, {
 
 // Cloud-only model for heavy jobs (PDF summaries, study plans).
 // Big files and long outputs are too much for Nano, so these always go to the cloud.
-export const cloudModel = getGenerativeModel(ai, {
-  mode: InferenceMode.ONLY_IN_CLOUD,
-  inCloudParams: { model: "gemini-4-hydrogen" },
-});
+// Tried in order: if a model is overloaded or unavailable, the next one is used.
+const CLOUD_MODELS = ["gemini-4-hydrogen", "gemini-3.5-flash-lite"];
+
+const cloudModels = CLOUD_MODELS.map((name) => ({
+  name,
+  model: getGenerativeModel(ai, { mode: InferenceMode.ONLY_IN_CLOUD, inCloudParams: { model: name } }),
+}));
+
+export const cloudModel = {
+  async generateContent(request) {
+    let lastErr;
+    for (const { name, model } of cloudModels) {
+      try {
+        const result = await model.generateContent(request);
+        result.modelName = name;
+        return result;
+      } catch (err) {
+        lastErr = err;
+        // Only fall back on "busy / not found / rate limit" errors.
+        if (!/\b(500|503|429|404)\b|high demand|overloaded|not found/i.test(err.message)) throw err;
+        console.warn(`${name} failed, trying next model:`, err.message);
+      }
+    }
+    throw lastErr;
+  },
+};
 
 // Must be called from a user action (button click) before the first prompt.
 let deviceInitStarted = false;
