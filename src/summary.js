@@ -14,6 +14,39 @@ const IMAGE_WIDTH = 900;        // px; enough to read a circuit or FSM
 // 2) On the laptop: pull out the text, and turn diagram slides into small images.
 // 3) Summarize: Nano if it's short and has no diagrams, otherwise Gemini in the cloud.
 // `source` is a CMS link, or { blob } for a PDF you uploaded yourself.
+// For the tutor: opens a PDF once and keeps it, with each slide's text,
+// so it can search slides and show slide pictures.
+export async function openPdf(source, onStep) {
+  let data;
+  if (typeof source === "string") {
+    onStep?.("Downloading PDF...");
+    const res = await withTimeout(fetch(source, { credentials: "include" }), 30000, "PDF download");
+    if (!res.ok) throw new Error(`Couldn't download the PDF (${res.status}).`);
+    data = new Uint8Array(await res.arrayBuffer());
+  } else {
+    data = new Uint8Array(await source.blob.arrayBuffer());
+  }
+  const pdf = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const content = await (await pdf.getPage(i)).getTextContent();
+    pages.push({ n: i, text: content.items.map((it) => it.str).join(" ").replace(/\s+/g, " ").trim() });
+  }
+  return { pdf, pages };
+}
+
+// One slide -> JPEG data URL (for showing in the chat or sending to the cloud).
+export async function slideImage(pdf, n, width = IMAGE_WIDTH) {
+  const page = await pdf.getPage(n);
+  const base = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: width / base.width });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  await page.render({ canvas, viewport }).promise;
+  return canvas.toDataURL("image/jpeg", 0.7);
+}
+
 // Downloads (or loads) a PDF and reads it on your laptop: slide text + diagram slides as images.
 // Used by summaries and by the tutor. `source` is a CMS link or { blob } for an upload.
 export async function readPdf(source, onStep) {

@@ -96,9 +96,19 @@
     </section>
 
     <section>
-      <h2>Ask the tutor</h2>
-      <textarea id="askInput" rows="2" placeholder="e.g. What's the difference between Moore and Mealy? (Enter to send)"></textarea>
-      <div id="askLog"></div>
+      <h2>Chat with your tutor</h2>
+      <p class="muted" id="chatHint">Uses the slides of what you picked above. Paste or attach a photo of your work to get it checked.</p>
+      <div id="chatLog"></div>
+      <div id="photoPreview" class="photo-preview" style="display:none">
+        <img id="photoThumb" alt="Attached photo" />
+        <button id="photoRemove" class="small" title="Remove photo">✕</button>
+      </div>
+      <div class="chat-input">
+        <button id="attachBtn" class="mic" title="Attach a photo">📎</button>
+        <textarea id="askInput" rows="2" placeholder="Ask anything... (Enter to send, Ctrl+V to paste a photo)"></textarea>
+        <button id="sendBtn" class="mic" title="Send">➤</button>
+      </div>
+      <input id="photoFile" type="file" accept="image/*" style="display:none" />
     </section>
   </div>
 

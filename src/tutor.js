@@ -1,5 +1,5 @@
 import { model, cloudModel } from "./ai.js";
-import { readPdf } from "./summary.js";
+import { readPdf, openPdf, slideImage } from "./summary.js";
 
 // ---------------------------------------------------------------------------
 // Mock quiz (cloud): written from the lectures it covers, in the style of the
@@ -97,28 +97,93 @@ Reply with ONLY JSON: {"correct": true or false, "feedback": one short sentence}
   }
 }
 
-// Ask the tutor: answers from your saved summaries, on your laptop.
-export async function askTutor(question, contextItems, history = []) {
-  const notes = contextItems
-    .filter((x) => x.summary)
-    .map((x) => `=== ${x.title} ===\n${x.summary}`)
-    .join("\n\n")
-    .slice(0, 6000);
-  const past = history
-    .slice(-2)
-    .map((h) => `Student: ${h.q}\nTutor: ${h.a}`)
-    .join("\n");
+// ---------------------------------------------------------------------------
+// Tutor chat: finds the most relevant slides on your laptop, answers from them,
+// and returns which slides it used so we can show them as pictures.
+// Text questions -> Nano (laptop). Questions with a photo -> cloud (reads images better).
+// ---------------------------------------------------------------------------
 
-  const prompt = `You are a friendly, clear university tutor. Explain simply, with a short example if it helps.
-Use the course notes below. If the notes don't cover it, say so and give a general explanation.
-Keep it under 150 words. Plain text, "- " bullets allowed, no markdown symbols.
+const STOP = new Set("the and for are was what how why when which with from that this does into about can you your have has explain show tell give me is of to in on a an it be do".split(" "));
+const words = (s) => (s.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w));
 
-COURSE NOTES:
-${notes || "(no summaries yet)"}
+const docCache = new Map(); // item id -> { pdf, pages }
 
-${past ? "EARLIER IN THIS CONVERSATION:\n" + past + "\n" : ""}
-Student: ${question}
-Tutor:`;
-  const result = await model.generateContent(prompt);
-  return { answer: result.response.text().trim(), source: result.response.inferenceSource ?? null };
+export async function loadDocs(targets, sourceOf, onStep) {
+  const docs = [];
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
+    if (!docCache.has(t.id)) {
+      onStep?.(`Opening ${t.title} on your laptop (${i + 1}/${targets.length})...`);
+      docCache.set(t.id, await openPdf(await sourceOf(t)));
+    }
+    docs.push({ item: t, ...docCache.get(t.id) });
+  }
+  return docs;
 }
+
+// Simple keyword match: which slides share the most words with the question?
+function topSlides(docs, question, k = 4) {
+  const q = words(question);
+  const scored = [];
+  docs.forEach((d, f) => {
+    for (const p of d.pages) {
+      if (!p.text) continue;
+      const pw = words(p.text);
+      const set = new Set(pw);
+      const hits = q.filter((w) => set.has(w)).length;
+      if (hits) scored.push({ f, n: p.n, score: hits + hits / Math.sqrt(pw.length + 1) });
+    }
+  });
+  return scored.sort((a, b) => b.score - a.score).slice(0, k);
+}
+
+export async function chatTutor({ question, photo, docs, history = [] }) {
+  const hits = topSlides(docs, question || "diagram");
+  const context = hits
+    .map((h) => `[F${h.f + 1} p${h.n}] (${docs[h.f].item.title}, slide ${h.n}): ${docs[h.f].pages[h.n - 1].text}`)
+    .join("\n")
+    .slice(0, photo ? 12000 : 4500);
+  const files = docs.map((d, i) => `F${i + 1} = ${d.item.title}`).join(", ");
+  const past = history.slice(-2).map((h) => `Student: ${h.q}\nTutor: ${h.a}`).join("\n");
+
+  const prompt = `You are a friendly, clear university tutor. Explain simply, with a short example if it helps. Under 150 words.
+Use the SLIDES below (files: ${files}). ${photo ? "The student also sent a photo (attached): read it carefully, and if it's their work, say what is right and what is wrong." : ""}
+If the slides don't cover it, say so and give a general explanation.
+Reply with ONLY JSON: {"answer": plain text (no markdown, "- " bullets ok), "refs": ["F1 p8", ...] the slides you used or that show the relevant diagram (max 3)}
+
+SLIDES:
+${context || "(no matching slides found)"}
+${past ? "\nEARLIER IN THIS CHAT:\n" + past : ""}
+Student: ${question || "(see the photo)"}`;
+
+  let result, source;
+  if (photo) {
+    const parts = [prompt, { inlineData: { mimeType: "image/jpeg", data: photo } }];
+    // Also show the cloud the top 2 matching slides as pictures (diagrams matter).
+    for (const h of hits.slice(0, 2)) {
+      const img = await slideImage(docs[h.f].pdf, h.n);
+      parts.push(`Slide F${h.f + 1} p${h.n}:`, { inlineData: { mimeType: "image/jpeg", data: img.split(",")[1] } });
+    }
+    result = await cloudModel.generateContent(parts);
+    source = "in_cloud";
+  } else {
+    result = await model.generateContent(prompt);
+    source = result.response.inferenceSource ?? "on_device";
+  }
+
+  const raw = result.response.text();
+  let answer = raw.trim();
+  let refs = [];
+  try {
+    const j = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+    answer = j.answer ?? answer;
+    refs = (j.refs ?? []).map((r) => String(r).match(/F(\d+)\s*p(\d+)/i)).filter(Boolean).map((m) => ({ f: +m[1] - 1, n: +m[2] }));
+  } catch {
+    // not JSON: show the text as-is, and fall back to the best-matching slide
+  }
+  if (!refs.length && hits.length) refs = [{ f: hits[0].f, n: hits[0].n }];
+  refs = refs.filter((r) => docs[r.f] && r.n >= 1 && r.n <= docs[r.f].pages.length).slice(0, 3);
+  return { answer, refs, source };
+}
+
+export { slideImage };

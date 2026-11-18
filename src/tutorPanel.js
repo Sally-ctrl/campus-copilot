@@ -1,4 +1,4 @@
-import { makeMockQuiz, gradeShort, askTutor, styleExamples } from "./tutor.js";
+import { makeMockQuiz, gradeShort, styleExamples, loadDocs, chatTutor, slideImage } from "./tutor.js";
 
 // The Tutor tab: pick a quiz or lecture, then "Quiz me" or "Ask".
 // `app` gives access to the list and helpers in sidepanel.js.
@@ -187,32 +187,103 @@ export function initTutor(app) {
     if (s) $("retakeBtn").style.display = s.holder.mockQuiz ? "inline-block" : "none";
   }
 
-  // ---------- Ask the tutor ----------
-  $("askInput").addEventListener("keydown", async (e) => {
-    if (e.key !== "Enter" || e.shiftKey) return;
-    e.preventDefault();
-    const q = e.target.value.trim();
-    if (!q) return;
-    app.startNano();
-    e.target.value = "";
-    const s = selected();
-    const context = s ? s.targets : app.items().filter((x) => x.summary).slice(0, 10);
-    const box = $("askLog");
-    const qEl = el("div", "you", q);
-    const aEl = el("div", "tutor", "Thinking on your laptop...");
-    box.prepend(aEl);
-    box.prepend(qEl);
-    try {
-      const { answer, source } = await askTutor(q, context, history);
-      history.push({ q, a: answer });
-      aEl.textContent = answer;
-      const where = String(source ?? "").includes("cloud") ? "cloud" : "on your laptop";
-      aEl.append(el("div", "meta", `(${where})`));
-      if (source) app.setStatus(source);
-    } catch (err) {
-      aEl.textContent = "Sorry: " + err.message;
+  // ---------- Chat with the tutor ----------
+  let photo = null; // base64 JPEG (no prefix)
+
+  // Photos are shrunk on your laptop before anything is sent.
+  async function setPhoto(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * scale);
+    c.height = Math.round(img.height * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const url = c.toDataURL("image/jpeg", 0.8);
+    photo = url.split(",")[1];
+    $("photoThumb").src = url;
+    $("photoPreview").style.display = "flex";
+  }
+  function clearPhoto() {
+    photo = null;
+    $("photoPreview").style.display = "none";
+    $("photoFile").value = "";
+  }
+
+  $("attachBtn").onclick = () => $("photoFile").click();
+  $("photoFile").onchange = (e) => setPhoto(e.target.files[0]);
+  $("photoRemove").onclick = clearPhoto;
+  $("askInput").addEventListener("paste", (e) => {
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+    if (file) {
+      e.preventDefault();
+      setPhoto(file);
     }
   });
+  $("askInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+  $("sendBtn").onclick = send;
+
+  async function send() {
+    const q = $("askInput").value.trim();
+    if (!q && !photo) return;
+    const s = selected();
+    if (!s || !s.targets.length) {
+      $("chatHint").textContent = "Pick a quiz or a lecture at the top first, so the tutor knows which slides to use.";
+      return;
+    }
+    app.startNano();
+    const sentPhoto = photo;
+    $("askInput").value = "";
+    clearPhoto();
+
+    const log = $("chatLog");
+    const you = el("div", "bubble you", q);
+    if (sentPhoto) {
+      const im = document.createElement("img");
+      im.src = "data:image/jpeg;base64," + sentPhoto;
+      im.className = "chat-img";
+      you.append(im);
+    }
+    const bot = el("div", "bubble tutor", sentPhoto ? "Looking at your photo (cloud)..." : "Thinking on your laptop...");
+    log.append(you, bot);
+    bot.scrollIntoView({ block: "nearest" });
+
+    try {
+      const docs = await loadDocs(s.targets.slice(0, 4), app.sourceOf, (m) => (bot.textContent = m));
+      bot.textContent = sentPhoto ? "Looking at your photo (cloud)..." : "Thinking on your laptop...";
+      const { answer, refs, source } = await chatTutor({ question: q, photo: sentPhoto, docs, history });
+      history.push({ q: q || "(photo)", a: answer });
+      if (source) app.setStatus(source);
+
+      bot.textContent = answer;
+      // Show the real slides it used.
+      if (refs.length) {
+        const strip = el("div", "slides", "");
+        for (const r of refs) {
+          const d = docs[r.f];
+          const fig = el("figure", "slide", "");
+          const im = document.createElement("img");
+          im.alt = `${d.item.title}, slide ${r.n}`;
+          im.src = await slideImage(d.pdf, r.n, 600);
+          im.onclick = () => fig.classList.toggle("big");
+          fig.append(im, el("figcaption", "meta", `${d.item.title} · slide ${r.n}`));
+          strip.append(fig);
+        }
+        bot.append(strip);
+      }
+      const where = String(source).includes("cloud") ? "cloud" : "on your laptop";
+      bot.append(el("div", "meta", `(${where})`));
+      bot.scrollIntoView({ block: "nearest" });
+    } catch (err) {
+      console.error(err);
+      bot.textContent = "Sorry: " + err.message;
+    }
+  }
 
   // ---------- helpers ----------
   function el(tag, cls, text) {
