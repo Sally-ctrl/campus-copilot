@@ -301,26 +301,43 @@ function getSummary(it, onStep) {
 
 const isPdf = (it) => it.link && /\.pdf($|\?)/i.test(it.link);
 
-// After a scan/sync: quietly prepare summaries for this week's lecture PDFs,
-// one at a time, so they're ready when you click.
+// After a scan/sync: quietly prepare summaries for this week's lecture PDFs.
+// Gentle on the free tier: one at a time, a pause between them, and if Google
+// says "busy / too many requests" we stop and leave the rest for later
+// (they stay as plain "Summarize", not "failed").
+const BG_GAP_MS = 20000;
+const BG_MAX = 4;
+const RATE_LIMITED = /429|busy|high demand|overloaded|quota|rate/i;
 let preparing = false;
+
 async function prepareSummaries() {
   if (preparing) return;
   preparing = true;
   const todo = items
     .filter((x) => x.kind === "coursework" && !isPast(x) && isPdf(x) && !x.summary && !x.summaryError)
-    .slice(0, 6);
+    .slice(0, BG_MAX);
+  let done = 0;
   try {
     for (let i = 0; i < todo.length; i++) {
+      if (i > 0) {
+        $("progress").textContent = `Next summary in ${BG_GAP_MS / 1000}s (${done}/${todo.length} ready)...`;
+        await new Promise((r) => setTimeout(r, BG_GAP_MS));
+      }
       $("progress").textContent = `Preparing summaries in the background (${i + 1}/${todo.length})...`;
       render();
       try {
         await getSummary(todo[i]);
-      } catch {
-        // already saved as summaryError; skip it and continue
+        done++;
+      } catch (err) {
+        if (RATE_LIMITED.test(err.message)) {
+          delete todo[i].summaryError; // not the lecture's fault; try again later
+          await save();
+          $("progress").textContent = `Paused: Gemini is busy. ${done} summary(ies) ready; the rest will be prepared next time.`;
+          return;
+        }
       }
     }
-    if (todo.length) $("progress").textContent = `${todo.length} summary(ies) ready.`;
+    if (todo.length) $("progress").textContent = `${done} summary(ies) ready.`;
   } finally {
     preparing = false;
     render();
