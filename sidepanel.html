@@ -13,6 +13,7 @@
 
   <nav class="tabs">
     <button class="tab active" data-tab="tabList">My list</button>
+    <button class="tab" data-tab="tabTutor">Tutor</button>
     <button class="tab" data-tab="tabAdd">Add</button>
   </nav>
 
@@ -77,6 +78,25 @@
 
   <p id="empty" class="muted">No items yet. Open a course page and click "Scan this page", or open your Courses list and click "Sync all courses".</p>
 
+  </div>
+
+  <div id="tabTutor" style="display:none">
+    <section>
+      <h2>Study with your tutor</h2>
+      <select id="tutorTarget"></select>
+      <p id="tutorInfo" class="muted"></p>
+      <div class="row">
+        <button id="quizBtn">Quiz me (TA style)</button>
+        <button id="retakeBtn" class="secondary" style="display:none">Retake saved quiz</button>
+      </div>
+      <div id="quizArea"></div>
+    </section>
+
+    <section>
+      <h2>Ask the tutor</h2>
+      <textarea id="askInput" rows="2" placeholder="e.g. What's the difference between Moore and Mealy? (Enter to send)"></textarea>
+      <div id="askLog"></div>
+    </section>
   </div>
 
   <div id="tabAdd" style="display:none">

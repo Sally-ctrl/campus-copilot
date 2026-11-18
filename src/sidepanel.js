@@ -6,6 +6,7 @@ import { keywordSearch, smartSearch } from "./search.js";
 import { runCommand } from "./commands.js";
 import { findCoverage, readiness } from "./coverage.js";
 import { saveFile, getFile, clearFiles } from "./files.js";
+import { initTutor } from "./tutorPanel.js";
 import { ensureMicPermission, startRecording, stopRecording, isRecording } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -570,12 +571,33 @@ function renderChips() {
 for (const tab of document.querySelectorAll(".tab")) {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
-    $("tabList").style.display = tab.dataset.tab === "tabList" ? "block" : "none";
-    $("tabAdd").style.display = tab.dataset.tab === "tabAdd" ? "block" : "none";
+    for (const id of ["tabList", "tabTutor", "tabAdd"]) {
+      $(id).style.display = tab.dataset.tab === id ? "block" : "none";
+    }
+    if (tab.dataset.tab === "tabTutor") tutor.refresh();
   });
 }
 
 const cleanCourse = (c) => (c ?? "").trim().toUpperCase().replace(/\s+/g, "") || null;
+
+// ---------- Tutor tab ----------
+async function openItem(it) {
+  if (!it) return;
+  if (it.localFile) {
+    const blob = await getFile(it.localFile);
+    if (blob) chrome.tabs.create({ url: URL.createObjectURL(blob) });
+  } else if (it.link) chrome.tabs.create({ url: it.link });
+}
+
+const tutor = initTutor({
+  items: () => items,
+  save,
+  render: () => render(),
+  setStatus: (s) => setStatus(s),
+  startNano: () => startNano(),
+  sourceOf: async (it) => (it.localFile ? { blob: await getFile(it.localFile) } : it.link),
+  openItem,
+});
 
 // ---------- Add tab: deadline form ----------
 $("deadlineForm").addEventListener("submit", async (e) => {

@@ -75,3 +75,16 @@ select, textarea { display: block; width: 100%; box-sizing: border-box; margin-t
 ul.checklist { margin-top: 6px; }
 ul.checklist li { background: #161616; padding: 6px 8px; margin-bottom: 4px; align-items: center; gap: 8px; font-size: 13px; }
 ul.checklist .title { font-size: 13px; }
+#tutorTarget { margin-top: 4px; }
+.qtext { font-size: 14px; line-height: 1.5; margin: 8px 0; white-space: pre-wrap; }
+.opts { display: flex; flex-direction: column; gap: 6px; }
+button.opt { text-align: left; background: #1c1c1c; border: 1px solid #333; color: #eee; }
+button.opt.ok { background: #1f4d33; border-color: #2fa36b; }
+button.opt.bad { background: #5a1f1f; border-color: #e05050; }
+.feedback { margin-top: 8px; font-size: 13px; }
+.feedback.ok { color: #a8e6c1; }
+.feedback.bad { color: #f5a8a8; }
+#quizArea textarea { margin-top: 4px; }
+#askInput { margin-top: 4px; }
+#askLog .you { margin-top: 10px; font-size: 13px; color: #8fb0ff; }
+#askLog .tutor { margin-top: 4px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; background: #161616; border: 1px solid #2a2a2a; border-radius: 6px; padding: 8px; }

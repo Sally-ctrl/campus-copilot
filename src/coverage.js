@@ -60,7 +60,11 @@ ${lines.join("\n")}`;
 export function readiness(deadline, covered, { minutesPerDay = 120 } = {}) {
   if (!covered.length) return null;
   const studied = covered.filter((it) => it.done).length / covered.length;
-  const score = Math.round(100 * studied);
+  // With a mock quiz from the Tutor tab: 60% studied + 40% quiz score.
+  const p = deadline.practice;
+  const score = p?.total
+    ? Math.round(100 * (0.6 * studied + 0.4 * (p.correct / p.total)))
+    : Math.round(100 * studied);
 
   const minutesLeft = covered.filter((it) => !it.done).reduce((n, it) => n + (it.minutes ?? 45), 0);
   const days = Math.max(0, Math.round((new Date(deadline.date) - new Date(new Date().toISOString().slice(0, 10))) / 86400000));

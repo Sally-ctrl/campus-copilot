@@ -14,7 +14,9 @@ const IMAGE_WIDTH = 900;        // px; enough to read a circuit or FSM
 // 2) On the laptop: pull out the text, and turn diagram slides into small images.
 // 3) Summarize: Nano if it's short and has no diagrams, otherwise Gemini in the cloud.
 // `source` is a CMS link, or { blob } for a PDF you uploaded yourself.
-export async function summarizePdf(source, { course, title, onStep } = {}) {
+// Downloads (or loads) a PDF and reads it on your laptop: slide text + diagram slides as images.
+// Used by summaries and by the tutor. `source` is a CMS link or { blob } for an upload.
+export async function readPdf(source, onStep) {
   let data;
   if (typeof source === "string") {
     onStep?.("Downloading PDF...");
@@ -24,10 +26,13 @@ export async function summarizePdf(source, { course, title, onStep } = {}) {
   } else {
     data = new Uint8Array(await source.blob.arrayBuffer());
   }
-
   onStep?.("Reading slides on your laptop...");
   const { slides, diagrams } = await readSlides(data, onStep);
-  const text = slides.join("\n");
+  return { text: slides.join("\n"), diagrams };
+}
+
+export async function summarizePdf(source, { course, title, onStep } = {}) {
+  const { text, diagrams } = await readPdf(source, onStep);
 
   const prompt = `This is "${title}" from university course ${course ?? ""}: the slide text, plus images of the slides that contain diagrams.
 Write for a student revising for a quiz. Plain text: no markdown, no backticks, only "- " bullets.
