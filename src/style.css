@@ -1,14 +1,37 @@
 body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: #111; color: #eee; }
 header { display: flex; align-items: center; justify-content: space-between; }
 h1 { font-size: 18px; margin: 0; }
-h2 { font-size: 14px; margin-top: 24px; color: #aaa; text-transform: uppercase; letter-spacing: .05em; }
-button { width: 100%; margin-top: 16px; padding: 10px; border: 0; border-radius: 8px; background: #4f7cff; color: #fff; font-size: 14px; cursor: pointer; }
+h2 { display: inline; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: .05em; }
+section { margin-top: 20px; }
+section h2 { display: block; margin-bottom: 8px; }
+.count { color: #666; font-weight: normal; }
+
+.row { display: flex; gap: 8px; margin-top: 14px; }
+button { flex: 1; padding: 10px; border: 0; border-radius: 8px; background: #4f7cff; color: #fff; font-size: 13px; cursor: pointer; }
+button.secondary { background: #2a2a2a; }
+button.danger { background: #5a1f1f; margin-top: 10px; width: 100%; }
 button:disabled { opacity: .6; cursor: wait; }
+
 .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: #333; }
 .badge.device { background: #1f6f43; }
 .badge.cloud { background: #6a4bc4; }
 .muted { color: #888; font-size: 13px; }
-ul { list-style: none; padding: 0; }
+
+details { margin-top: 12px; }
+summary { cursor: pointer; color: #aaa; font-size: 13px; }
+label { display: block; margin-top: 8px; font-size: 13px; color: #ccc; }
+input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1c1c1c; color: #eee; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.chip { flex: none; padding: 4px 10px; border-radius: 999px; background: #222; color: #ccc; font-size: 12px; }
+.chip.active { background: #4f7cff; color: #fff; }
+
+ul { list-style: none; padding: 0; margin: 0; }
 li { background: #1c1c1c; border-radius: 8px; padding: 10px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
+li.deadline { border-left: 3px solid #e0a030; }
+li.soon { border-left-color: #e05050; }
 li.done .title { text-decoration: line-through; color: #777; }
+.title { font-size: 14px; }
 .meta { font-size: 12px; color: #999; margin-top: 2px; }
+.when { font-size: 12px; color: #e0a030; margin-top: 2px; }
+li.soon .when { color: #ff7070; }

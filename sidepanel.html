@@ -11,12 +11,38 @@
     <span id="status" class="badge">Idle</span>
   </header>
 
-  <button id="readBtn">Find tasks on this page</button>
+  <div class="row">
+    <button id="readBtn">Scan this page</button>
+    <button id="syncBtn" class="secondary">Sync all courses</button>
+  </div>
   <p id="progress" class="muted"></p>
 
-  <h2>To-do</h2>
-  <ul id="taskList"></ul>
-  <p id="empty" class="muted">No tasks yet. Open your portal and click the button.</p>
+  <details id="settings">
+    <summary>Settings</summary>
+    <label>My tutorial group
+      <input id="groupInput" placeholder="e.g. T14" />
+    </label>
+    <button id="clearBtn" class="danger">Clear all items</button>
+  </details>
+
+  <div id="courseFilter" class="chips"></div>
+
+  <section>
+    <h2>Upcoming deadlines <span id="countDeadlines" class="count"></span></h2>
+    <ul id="deadlineList"></ul>
+  </section>
+
+  <section>
+    <h2>Coursework · Next <span id="countNext" class="count"></span></h2>
+    <ul id="nextList"></ul>
+  </section>
+
+  <details class="past">
+    <summary><h2>Past &amp; done <span id="countPast" class="count"></span></h2></summary>
+    <ul id="pastList"></ul>
+  </details>
+
+  <p id="empty" class="muted">No items yet. Open a course page and click "Scan this page", or open your Courses list and click "Sync all courses".</p>
 
   <script type="module" src="./src/sidepanel.js"></script>
 </body>
