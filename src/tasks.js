@@ -41,10 +41,23 @@ export async function extractItems(pageText, { course, group, onChunk } = {}) {
     const result = await model.generateContent(buildPrompt(chunks[i], course, group));
     source = result.response.inferenceSource ?? source;
     for (const it of parseJsonArray(result.response.text())) {
-      items.push({ ...it, course: course ?? it.course ?? null });
+      items.push(clean({ ...it, course: course ?? it.course ?? null }));
     }
   }
   return { items, source };
+}
+
+// Fixes common model mistakes: unpadded dates ("2026-11-7") and
+// practice material wrongly marked as a deadline.
+const COURSEWORK_WORDS = /practice|solution|tutorial|lecture|lab|slides|sheet|notes|material/i;
+
+function clean(it) {
+  const m = String(it.date ?? "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  it.date = m ? `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}` : null;
+  if (it.kind === "deadline" && COURSEWORK_WORDS.test(it.title) && !/quiz|exam|midterm|final/i.test(it.title)) {
+    it.kind = "coursework";
+  }
+  return it;
 }
 
 // GUC course pages show the code like "(|CSEN605|)".
