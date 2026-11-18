@@ -420,12 +420,9 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     for n, (topic, items) in DSD_EARLY.items():
         simple_lecture(f"DSD301_Lecture{n}.pdf", DSD, f"Lecture {n}: {topic}", [(topic, items)])
-    dsd_lecture_7()
-    dsd_lecture_8()
-    dsd_lecture_9()
-    for n, (topic, qs) in DSD_PRACTICE.items():
-        dsd_practice(n, topic, qs)
-        dsd_practice(n, topic, qs, solution=True)
+    # Full DSD301 lectures 7-9, practice assignments and sample quizzes (with figures).
+    import dsd_course
+    dsd_course.build_all(OUT)
     for course, files in OTHER.items():
         for fname, title, slides in files:
             simple_lecture(fname, course, title, slides)

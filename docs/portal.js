@@ -42,6 +42,7 @@ const COURSES = [
         <li><p><strong>Exam Hall 2:</strong> T21 – T26</p></li>
         <li><p><strong>Exam Hall 3:</strong> T27 – T31</p></li>
       </ul>
+      <p><strong>Quiz 2 covers Lectures 7 to 9</strong> (latches, flip-flops, Moore and Mealy machines, FSMs in VHDL). Sample Quiz 2 from last semester is posted in Week 9.</p>
       <p><strong>Important Instructions:</strong> bring your university ID. No calculators. Arrive 10 minutes early.</p>
       <hr />
       <p><strong>Project Milestone 2</strong> submission deadline: ${shortDate(addDays(6))} at 23:59 through the portal. Late submissions are not accepted.</p>
@@ -57,11 +58,11 @@ const COURSES = [
       </table>
       <p>Please contact the TA assigned to your project team during the office hours listed above.</p>`,
     weeks: [
-      { desc: "Week 9", items: [item(1, "Lecture 9", "Lecture slides", F("DSD301_Lecture9_Mealy_VHDL")), item(2, "Practice Assignment 8", "Assignment ", F("DSD301_Practice8"))] },
+      { desc: "Week 9", items: [item(1, "Lecture 9", "Lecture slides", F("DSD301_Lecture9_Mealy_VHDL")), item(2, "Practice Assignment 8", "Assignment ", F("DSD301_Practice8")), item(3, "Sample Quiz 2 (WS25)", "Quiz", F("DSD301_Sample_Quiz2_WS25")), item(4, "Sample Quiz 2 (WS25) Solution", "Quiz solution", F("DSD301_Sample_Quiz2_WS25_Solution"))] },
       { desc: "Week 8", items: [item(1, "Lecture 8", "Lecture slides", F("DSD301_Lecture8_FSM_Moore"), true), item(2, "Practice Assignment 7", "Assignment ", F("DSD301_Practice7"), true), item(3, "Practice Assignment 6 Solution", "Assignment solution", F("DSD301_Practice6_Solution"), true)] },
       { desc: "Week 7", items: [item(1, "Lecture 7", "Lecture slides", F("DSD301_Lecture7_Latches_FlipFlops"), true), item(2, "Practice Assignment 6", "Assignment ", F("DSD301_Practice6"), true), item(3, "Practice Assignment 7 Solution", "Assignment solution", F("DSD301_Practice7_Solution"))] },
       { desc: "Week 6", items: [item(1, "Lecture 6", "Lecture slides", F("DSD301_Lecture6"), true)] },
-      { desc: "Week 5", items: [item(1, "Lecture 5", "Lecture slides", F("DSD301_Lecture5"), true)] },
+      { desc: "Week 5", items: [item(1, "Lecture 5", "Lecture slides", F("DSD301_Lecture5"), true), item(2, "Sample Quiz 1 (WS25)", "Quiz", F("DSD301_Sample_Quiz1_WS25"), true), item(3, "Sample Quiz 1 (WS25) Solution", "Quiz solution", F("DSD301_Sample_Quiz1_WS25_Solution"), true)] },
       { desc: "Week 4", items: [item(1, "Lecture 4", "Lecture slides", F("DSD301_Lecture4"), true)] },
       { desc: "Week 3", items: [item(1, "Lecture 3", "Lecture slides", F("DSD301_Lecture3"), true)] },
       { desc: "Week 2", items: [item(1, "Lecture 2", "Lecture slides", F("DSD301_Lecture2"), true)] },
