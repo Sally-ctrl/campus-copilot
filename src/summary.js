@@ -24,7 +24,11 @@ export async function summarizePdf(url, { course, title, onStep } = {}) {
   const text = slides.join("\n");
 
   const prompt = `This is "${title}" from university course ${course ?? ""}: the slide text, plus images of the slides that contain diagrams.
-Write for a student revising for a quiz. Plain text, no markdown symbols except "- " bullets.
+Write for a student revising for a quiz. Plain text: no markdown, no backticks, only "- " bullets.
+
+Start with exactly these two lines:
+DIFFICULTY: Easy, Medium or Hard (for a typical student in this course)
+STUDY TIME: estimated minutes to study this lecture well, as a number (e.g. 45)
 Use the diagrams too (circuits, state machines, timing diagrams, tables) and mention them where they matter.
 
 SUMMARY
@@ -40,7 +44,7 @@ ${text.slice(0, CLOUD_MAX_CHARS)}`;
   if (!diagrams.length && text.length <= NANO_MAX_CHARS && (await nanoAvailable())) {
     onStep?.("Summarizing on your laptop (Nano)...");
     const result = await model.generateContent(prompt);
-    return { summary: result.response.text().trim(), source: "on_device" };
+    return { ...parseSummary(result.response.text()), source: "on_device" };
   }
 
   // Otherwise: text + diagram images to the cloud.
@@ -54,7 +58,7 @@ ${text.slice(0, CLOUD_MAX_CHARS)}`;
     onModel: (name) =>
       onStep?.(`Asking ${name} (${diagrams.length} diagram${diagrams.length === 1 ? "" : "s"}, ${kb} KB)...`),
   });
-  return { summary: result.response.text().trim(), source: "in_cloud" };
+  return { ...parseSummary(result.response.text()), source: "in_cloud" };
 }
 
 // Reads every slide's text, then picks the slides that look most like diagrams
@@ -118,4 +122,20 @@ async function renderJpeg(page) {
   canvas.height = Math.round(viewport.height);
   await page.render({ canvas, viewport }).promise;
   return canvas.toDataURL("image/jpeg", 0.6).split(",")[1];
+}
+
+// Pulls the DIFFICULTY and STUDY TIME lines out of the answer.
+function parseSummary(text) {
+  const difficulty = text.match(/DIFFICULTY:\s*(Easy|Medium|Hard)/i)?.[1] ?? null;
+  const minutes = Number(text.match(/STUDY TIME:\D*(\d+)/i)?.[1]) || null;
+  const summary = text
+    .replace(/^.*DIFFICULTY:.*$/im, "")
+    .replace(/^.*STUDY TIME:.*$/im, "")
+    .replace(/`/g, "")
+    .trim();
+  return {
+    summary,
+    difficulty: difficulty && difficulty[0].toUpperCase() + difficulty.slice(1).toLowerCase(),
+    minutes,
+  };
 }

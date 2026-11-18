@@ -42,3 +42,7 @@ a.title:hover { color: #8fb0ff; text-decoration: underline; }
 .new { font-size: 10px; font-weight: 600; background: #4f7cff; color: #fff; padding: 1px 5px; border-radius: 4px; margin-right: 6px; }
 button.small { flex: none; width: auto; margin-top: 8px; padding: 4px 10px; font-size: 12px; background: #2a2a2a; color: #cfd8ff; }
 .summary { white-space: pre-wrap; font-size: 12.5px; line-height: 1.5; color: #ddd; background: #161616; border: 1px solid #2a2a2a; border-radius: 6px; padding: 8px; margin-top: 8px; }
+.level { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; margin-left: 4px; background: #2a2a2a; color: #ccc; white-space: nowrap; }
+.level.easy { background: #1f4d33; color: #a8e6c1; }
+.level.medium { background: #5a4410; color: #f5d488; }
+.level.hard { background: #5a1f1f; color: #f5a8a8; }

@@ -38,23 +38,32 @@ const cloudModels = CLOUD_MODELS.map((name) => ({
   model: getGenerativeModel(ai, { mode: InferenceMode.ONLY_IN_CLOUD, inCloudParams: { model: name } }),
 }));
 
+const BUSY = /\b(500|503|429)\b|high demand|overloaded/i;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export const cloudModel = {
   async generateContent(request, { onModel } = {}) {
-    let lastErr;
+    const reasons = [];
     for (const { name, model } of cloudModels) {
-      onModel?.(name);
-      try {
-        const result = await withTimeout(model.generateContent(request), PER_MODEL_TIMEOUT, name);
-        result.modelName = name;
-        return result;
-      } catch (err) {
-        lastErr = err;
-        // Fall back only on "busy / slow / not found / rate limit" errors.
-        if (!/\b(500|503|429|404)\b|high demand|overloaded|not found|too long/i.test(err.message)) throw err;
-        console.warn(`${name} failed, trying next model:`, err.message);
+      // Each model gets 2 tries: busy errors are often gone a few seconds later.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        onModel?.(attempt === 1 ? name : `${name} (retry)`);
+        try {
+          const result = await withTimeout(model.generateContent(request), PER_MODEL_TIMEOUT, name);
+          result.modelName = name;
+          return result;
+        } catch (err) {
+          const short = err.message.includes("high demand") ? "busy (high demand)" : err.message.slice(0, 120);
+          reasons.push(`${name}: ${short}`);
+          console.warn(`${name} attempt ${attempt} failed:`, err.message);
+          const fallBack = BUSY.test(err.message) || /404|not found|too long/i.test(err.message);
+          if (!fallBack) throw err;
+          if (!BUSY.test(err.message)) break; // slow or missing: don't retry, go to next model
+          if (attempt === 1) await sleep(3000);
+        }
       }
     }
-    throw lastErr;
+    throw new Error("All cloud models failed. " + reasons.join(" | "));
   },
 };
 

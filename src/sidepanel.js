@@ -247,6 +247,12 @@ function renderList(el, list, { deadline = false } = {}) {
       tag.textContent = "NEW";
       meta.prepend(tag);
     }
+    if (it.difficulty || it.minutes) {
+      const lvl = document.createElement("span");
+      lvl.className = "level " + (it.difficulty ?? "").toLowerCase();
+      lvl.textContent = [it.difficulty, it.minutes ? `~${it.minutes} min` : null].filter(Boolean).join(" · ");
+      meta.append(" ", lvl);
+    }
     const when = document.createElement("div");
     when.className = "when";
     when.textContent = whenLabel(it);
@@ -268,8 +274,14 @@ function getSummary(it, onStep) {
   if (pending.has(it.id)) return pending.get(it.id);
   const job = (async () => {
     try {
-      const { summary, source } = await summarizePdf(it.link, { course: it.course, title: it.title, onStep });
+      const { summary, difficulty, minutes, source } = await summarizePdf(it.link, {
+        course: it.course,
+        title: it.title,
+        onStep,
+      });
       it.summary = summary;
+      it.difficulty = difficulty;
+      it.minutes = minutes;
       delete it.summaryError;
       setStatus(source);
       await save();
