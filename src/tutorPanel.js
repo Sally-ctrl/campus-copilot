@@ -231,10 +231,16 @@ export function initTutor(app) {
   async function send() {
     const q = $("askInput").value.trim();
     if (!q && !photo) return;
-    const s = selected();
+    // Nothing picked? Find the 2 lectures that best match the question (titles + summaries).
+    let s = selected();
     if (!s || !s.targets.length) {
-      $("chatHint").textContent = "Pick a quiz or a lecture at the top first, so the tutor knows which slides to use.";
-      return;
+      const guess = guessFiles(q);
+      if (!guess.length) {
+        $("chatHint").textContent = "I couldn't tell which lecture that's about. Pick one at the top, or mention its topic.";
+        return;
+      }
+      s = { targets: guess };
+      $("chatHint").textContent = "Using: " + guess.map((g) => `${g.title} (${g.course ?? ""})`).join(", ") + ". Pick at the top to choose yourself.";
     }
     app.startNano();
     const sentPhoto = photo;
@@ -283,6 +289,21 @@ export function initTutor(app) {
       console.error(err);
       bot.textContent = "Sorry: " + err.message;
     }
+  }
+
+  function guessFiles(question) {
+    const qw = (question.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !/^(the|and|what|how|why|difference|between|explain|show|does|this|that|with|about)$/.test(w));
+    if (!qw.length) return [];
+    return app.items()
+      .filter((x) => isPdf(x) && !/solution|answer/i.test(`${x.title} ${x.type}`))
+      .map((x) => {
+        const hay = `${x.title} ${x.course} ${x.summary ?? ""}`.toLowerCase();
+        return { x, score: qw.filter((w) => hay.includes(w)).length + (qw.some((w) => x.title.toLowerCase().includes(w)) ? 2 : 0) };
+      })
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map((r) => r.x);
   }
 
   // ---------- helpers ----------
