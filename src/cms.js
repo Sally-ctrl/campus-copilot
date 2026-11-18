@@ -43,7 +43,7 @@ export function readCmsPage() {
         title,
         type: type || "material",
         date: weekDate,
-        link: href ? new URL(href, location.origin).href : null,
+        link: href ? new URL(href, location.href).href : null,
         opened: btn?.dataset.seen === "yes",
       });
     }

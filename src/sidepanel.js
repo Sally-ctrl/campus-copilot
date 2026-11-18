@@ -134,13 +134,18 @@ function startNano() {
 // ---------- only work on the CMS ----------
 // The extension only has permission for cms.guc.edu.eg, so on any other site
 // Chrome doesn't even tell us the URL. Buttons are enabled only on the CMS.
-const CMS_HOST = "cms.guc.edu.eg";
+// The real GUC CMS, plus the public demo portal used for judging.
+const PORTALS = [
+  (u) => u.hostname === "cms.guc.edu.eg",
+  (u) => u.hostname === "sally-ctrl.github.io" && u.pathname.startsWith("/campus-copilot/"),
+];
 let working = false;
 
 async function onCms() {
   const tab = await activeTab();
   try {
-    return new URL(tab?.url ?? "").hostname === CMS_HOST;
+    const u = new URL(tab?.url ?? "");
+    return PORTALS.some((ok) => ok(u));
   } catch {
     return false;
   }

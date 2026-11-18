@@ -9,7 +9,8 @@
     "storage"
   ],
   "host_permissions": [
-    "https://cms.guc.edu.eg/*"
+    "https://cms.guc.edu.eg/*",
+    "https://sally-ctrl.github.io/campus-copilot/*"
   ],
   "background": {
     "service_worker": "background.js"
