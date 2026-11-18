@@ -54,13 +54,13 @@ ${lines.join("\n")}`;
   return [...new Set(nums.map(Number))].filter((n) => n < list.length).map((n) => list[n]);
 }
 
-// Readiness: opened (1/3) + studied/ticked (2/3). Practice questions get a share later.
+// Readiness = share of the covered materials you ticked as studied.
+// (Opening a file doesn't count: opening isn't studying.) Practice questions get a share later.
 // Time check: study minutes left vs. time until the quiz.
 export function readiness(deadline, covered, { minutesPerDay = 120 } = {}) {
   if (!covered.length) return null;
-  const opened = covered.filter((it) => it.opened || it.done).length / covered.length;
   const studied = covered.filter((it) => it.done).length / covered.length;
-  const score = Math.round(100 * (opened / 3 + (2 * studied) / 3));
+  const score = Math.round(100 * studied);
 
   const minutesLeft = covered.filter((it) => !it.done).reduce((n, it) => n + (it.minutes ?? 45), 0);
   const days = Math.max(0, Math.round((new Date(deadline.date) - new Date(new Date().toISOString().slice(0, 10))) / 86400000));

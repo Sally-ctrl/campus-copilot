@@ -288,7 +288,7 @@ function renderList(el, list, { deadline = false } = {}) {
     when.textContent = whenLabel(it);
     body.append(title, meta, when);
     if (isPdf(it)) body.append(summaryBlock(it));
-    if (it.kind === "deadline" && it.type !== "reminder" && !it.done) body.append(readinessBlock(it));
+    if (it.kind === "deadline" && it.type !== "reminder" && !isPast(it)) body.append(readinessBlock(it));
 
     li.append(box, body);
     el.append(li);
