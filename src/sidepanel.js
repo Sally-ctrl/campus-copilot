@@ -271,6 +271,12 @@ function renderList(el, list, { deadline = false } = {}) {
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = [it.course, it.type, it.details].filter(Boolean).join(" · ");
+    if (it.manual) {
+      const mine = document.createElement("span");
+      mine.className = "mine";
+      mine.textContent = it.localFile ? "UPLOADED" : "ADDED BY YOU";
+      meta.prepend(mine);
+    }
     if (it.kind === "coursework" && !it.opened && !it.done) {
       const tag = document.createElement("span");
       tag.className = "new";
@@ -737,13 +743,20 @@ function render() {
   const byDate = (a, b) =>
     (a.date ?? "9999").localeCompare(b.date ?? "9999") || (a.time ?? "").localeCompare(b.time ?? "");
 
-  const deadlines = visible.filter((x) => x.kind === "deadline" && !isPast(x)).sort(byDate);
-  const next = visible.filter((x) => x.kind !== "deadline" && !isPast(x)).sort(byDate);
-  const past = visible.filter(isPast).sort((a, b) => byDate(b, a));
+  // Your uploads get their own section, separate from CMS course material.
+  const uploads = visible.filter((x) => x.localFile).sort((a, b) => byDate(b, a));
+  const fromCms = visible.filter((x) => !x.localFile);
+
+  const deadlines = fromCms.filter((x) => x.kind === "deadline" && !isPast(x)).sort(byDate);
+  const next = fromCms.filter((x) => x.kind !== "deadline" && !isPast(x)).sort(byDate);
+  const past = fromCms.filter(isPast).sort((a, b) => byDate(b, a));
 
   renderList($("deadlineList"), deadlines, { deadline: true });
   renderList($("nextList"), next);
   renderList($("pastList"), past);
+  renderList($("uploadList"), uploads);
+  $("countUploads").textContent = `(${uploads.length})`;
+  $("uploadEmpty").style.display = uploads.length ? "none" : "block";
 
   $("countDeadlines").textContent = `(${deadlines.length})`;
   $("countNext").textContent = `(${next.length})`;
