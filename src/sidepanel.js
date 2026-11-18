@@ -154,7 +154,7 @@ $("readBtn").addEventListener("click", () =>
     await save();
     render();
     $("progress").textContent = `Done. ${added} new item(s) from ${page.code}.`;
-  })
+  }).then(prepareSummaries)
 );
 
 $("syncBtn").addEventListener("click", () =>
@@ -181,7 +181,7 @@ $("syncBtn").addEventListener("click", () =>
       render();
     }
     $("progress").textContent = `Synced ${links.length} course(s). ${added} new item(s).`;
-  })
+  }).then(prepareSummaries)
 );
 
 // ---------- UI ----------
@@ -251,10 +251,67 @@ function renderList(el, list, { deadline = false } = {}) {
     when.className = "when";
     when.textContent = whenLabel(it);
     body.append(title, meta, when);
-    if (it.link && /\.pdf($|\?)/i.test(it.link)) body.append(summaryBlock(it));
+    if (isPdf(it)) body.append(summaryBlock(it));
 
     li.append(box, body);
     el.append(li);
+  }
+}
+
+// ---------- summaries ----------
+// One shared function for the button and the background job, so the same
+// PDF is never summarized twice at the same time.
+const pending = new Map();
+
+function getSummary(it, onStep) {
+  if (it.summary) return Promise.resolve(it.summary);
+  if (pending.has(it.id)) return pending.get(it.id);
+  const job = (async () => {
+    try {
+      const { summary, source } = await summarizePdf(it.link, { course: it.course, title: it.title, onStep });
+      it.summary = summary;
+      delete it.summaryError;
+      setStatus(source);
+      await save();
+      return summary;
+    } catch (err) {
+      console.error(err);
+      it.summaryError = err.message;
+      await save();
+      throw err;
+    } finally {
+      pending.delete(it.id);
+    }
+  })();
+  pending.set(it.id, job);
+  return job;
+}
+
+const isPdf = (it) => it.link && /\.pdf($|\?)/i.test(it.link);
+
+// After a scan/sync: quietly prepare summaries for this week's lecture PDFs,
+// one at a time, so they're ready when you click.
+let preparing = false;
+async function prepareSummaries() {
+  if (preparing) return;
+  preparing = true;
+  const todo = items
+    .filter((x) => x.kind === "coursework" && !isPast(x) && isPdf(x) && !x.summary && !x.summaryError)
+    .slice(0, 6);
+  try {
+    for (let i = 0; i < todo.length; i++) {
+      $("progress").textContent = `Preparing summaries in the background (${i + 1}/${todo.length})...`;
+      render();
+      try {
+        await getSummary(todo[i]);
+      } catch {
+        // already saved as summaryError; skip it and continue
+      }
+    }
+    if (todo.length) $("progress").textContent = `${todo.length} summary(ies) ready.`;
+  } finally {
+    preparing = false;
+    render();
   }
 }
 
@@ -265,7 +322,10 @@ function summaryBlock(it) {
   const wrap = document.createElement("div");
   const btn = document.createElement("button");
   btn.className = "small";
-  btn.textContent = it.summary ? (openSummaries.has(it.id) ? "Hide summary" : "Show summary") : "Summarize (cloud)";
+  btn.textContent = it.summary
+    ? (openSummaries.has(it.id) ? "Hide summary" : "Show summary")
+    : it.summaryError ? "Retry summary" : "Summarize";
+  if (it.summaryError && !it.summary) btn.title = it.summaryError;
   wrap.append(btn);
 
   if (it.summary && openSummaries.has(it.id)) {
@@ -275,24 +335,21 @@ function summaryBlock(it) {
     wrap.append(box);
   }
 
+  if (!it.summary && pending.has(it.id)) {
+    btn.disabled = true;
+    btn.textContent = "Preparing...";
+  }
+
   btn.addEventListener("click", async () => {
     if (it.summary) {
       openSummaries.has(it.id) ? openSummaries.delete(it.id) : openSummaries.add(it.id);
       return render();
     }
     btn.disabled = true;
-    btn.textContent = "Summarizing in the cloud...";
     try {
-      it.summary = await summarizePdf(it.link, {
-        course: it.course,
-        title: it.title,
-        onStep: (msg) => (btn.textContent = msg),
-      });
-      setStatus("in_cloud");
+      await getSummary(it, (msg) => (btn.textContent = msg));
       openSummaries.add(it.id);
-      await save();
     } catch (err) {
-      console.error(err);
       btn.textContent = "Failed: " + err.message;
       btn.disabled = false;
       return;

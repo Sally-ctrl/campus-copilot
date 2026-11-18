@@ -1,37 +1,121 @@
-import { cloudModel, withTimeout } from "./ai.js";
+import * as pdfjs from "pdfjs-dist";
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { model, cloudModel, withTimeout, nanoAvailable } from "./ai.js";
 
-// Downloads a lecture PDF (using your CMS login in Chrome) and asks
-// Gemini in the cloud for a short summary + likely quiz topics.
+// pdf.js reads the PDF on your laptop (no AI, no upload).
+pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+const NANO_MAX_CHARS = 5000;    // short, text-only lectures stay on Nano
+const CLOUD_MAX_CHARS = 60000;
+const MAX_DIAGRAMS = 12;        // cap on slide images sent to the cloud
+const IMAGE_WIDTH = 900;        // px; enough to read a circuit or FSM
+
+// 1) Download the PDF with your CMS login.
+// 2) On the laptop: pull out the text, and turn diagram slides into small images.
+// 3) Summarize: Nano if it's short and has no diagrams, otherwise Gemini in the cloud.
 export async function summarizePdf(url, { course, title, onStep } = {}) {
   onStep?.("Downloading PDF...");
   const res = await withTimeout(fetch(url, { credentials: "include" }), 30000, "PDF download");
   if (!res.ok) throw new Error(`Couldn't download the PDF (${res.status}).`);
-  const blob = await res.blob();
-  if (blob.size > 15 * 1024 * 1024) throw new Error("PDF is too big (over 15 MB).");
+  const data = new Uint8Array(await res.arrayBuffer());
 
-  const prompt = `This is "${title}" from university course ${course ?? ""}.
+  onStep?.("Reading slides on your laptop...");
+  const { slides, diagrams } = await readSlides(data, onStep);
+  const text = slides.join("\n");
+
+  const prompt = `This is "${title}" from university course ${course ?? ""}: the slide text, plus images of the slides that contain diagrams.
 Write for a student revising for a quiz. Plain text, no markdown symbols except "- " bullets.
+Use the diagrams too (circuits, state machines, timing diagrams, tables) and mention them where they matter.
 
 SUMMARY
 - 5 to 7 bullets with the main ideas, short and clear.
 
 LIKELY QUIZ TOPICS
-- 3 to 5 bullets: what a quiz on this lecture would most likely ask.`;
+- 3 to 5 bullets: what a quiz on this lecture would most likely ask.
 
-  const kb = Math.round(blob.size / 1024);
-  const result = await cloudModel.generateContent([
-    prompt,
-    { inlineData: { mimeType: "application/pdf", data: await toBase64(blob) } },
-  ], { onModel: (name) => onStep?.(`Asking ${name} (${kb} KB)...`) });
-  return result.response.text().trim();
+SLIDE TEXT:
+${text.slice(0, CLOUD_MAX_CHARS)}`;
+
+  // Short, text-only lecture and Nano is ready: stay fully on-device.
+  if (!diagrams.length && text.length <= NANO_MAX_CHARS && (await nanoAvailable())) {
+    onStep?.("Summarizing on your laptop (Nano)...");
+    const result = await model.generateContent(prompt);
+    return { summary: result.response.text().trim(), source: "on_device" };
+  }
+
+  // Otherwise: text + diagram images to the cloud.
+  const parts = [prompt];
+  for (const d of diagrams) {
+    parts.push(`Slide ${d.page} (diagram):`);
+    parts.push({ inlineData: { mimeType: "image/jpeg", data: d.jpeg } });
+  }
+  const kb = Math.round((text.length + diagrams.reduce((n, d) => n + d.jpeg.length, 0)) / 1024);
+  const result = await cloudModel.generateContent(parts, {
+    onModel: (name) =>
+      onStep?.(`Asking ${name} (${diagrams.length} diagram${diagrams.length === 1 ? "" : "s"}, ${kb} KB)...`),
+  });
+  return { summary: result.response.text().trim(), source: "in_cloud" };
 }
 
-// Blob -> base64 string (without the "data:...;base64," prefix).
-function toBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1]);
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
+// Reads every slide's text, then picks the slides that look most like diagrams
+// and renders only those to JPEGs.
+async function readSlides(data, onStep) {
+  // isEvalSupported: false because Chrome extensions block eval().
+  const pdf = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
+  const slides = [];
+  const scored = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const line = content.items.map((it) => it.str).join(" ").replace(/\s+/g, " ").trim();
+    if (line) slides.push(`Slide ${i}: ${line}`);
+    scored.push({ page: i, score: await diagramScore(page, line.length) });
+  }
+
+  const picked = scored
+    .filter((s) => s.score >= 20)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_DIAGRAMS)
+    .sort((a, b) => a.page - b.page);
+
+  const diagrams = [];
+  for (const { page: n } of picked) {
+    onStep?.(`Preparing diagram slides (${diagrams.length + 1}/${picked.length})...`);
+    diagrams.push({ page: n, jpeg: await renderJpeg(await pdf.getPage(n)) });
+  }
+  return { slides, diagrams };
+}
+
+// Higher = more diagram-like: lots of drawn lines/shapes, big pictures, little text.
+// Small images (logos) don't count.
+async function diagramScore(page, textLength) {
+  const { width, height } = page.getViewport({ scale: 1 });
+  const pageArea = width * height;
+  const ops = await page.getOperatorList();
+  let paths = 0;
+  let bigImages = 0;
+  let lastTransform = null;
+
+  ops.fnArray.forEach((fn, k) => {
+    if (fn === pdfjs.OPS.transform) lastTransform = ops.argsArray[k];
+    else if (fn === pdfjs.OPS.constructPath) paths++;
+    else if (fn === pdfjs.OPS.paintImageXObject || fn === pdfjs.OPS.paintInlineImageXObject) {
+      const [a, , , d] = lastTransform ?? [0, 0, 0, 0];
+      if (Math.abs(a * d) > 0.15 * pageArea) bigImages++;
+    }
   });
+
+  return paths + 40 * bigImages - textLength / 25;
+}
+
+// Slide -> small JPEG (base64, no "data:" prefix).
+async function renderJpeg(page) {
+  const base = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: IMAGE_WIDTH / base.width });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  await page.render({ canvas, viewport }).promise;
+  return canvas.toDataURL("image/jpeg", 0.6).split(",")[1];
 }
