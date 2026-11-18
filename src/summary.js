@@ -2,8 +2,9 @@ import { cloudModel } from "./ai.js";
 
 // Downloads a lecture PDF (using your CMS login in Chrome) and asks
 // Gemini in the cloud for a short summary + likely quiz topics.
-export async function summarizePdf(url, { course, title } = {}) {
-  const res = await fetch(url, { credentials: "include" });
+export async function summarizePdf(url, { course, title, onStep } = {}) {
+  onStep?.("Downloading PDF...");
+  const res = await withTimeout(fetch(url, { credentials: "include" }), 30000, "PDF download");
   if (!res.ok) throw new Error(`Couldn't download the PDF (${res.status}).`);
   const blob = await res.blob();
   if (blob.size > 15 * 1024 * 1024) throw new Error("PDF is too big (over 15 MB).");
@@ -17,10 +18,11 @@ SUMMARY
 LIKELY QUIZ TOPICS
 - 3 to 5 bullets: what a quiz on this lecture would most likely ask.`;
 
-  const result = await cloudModel.generateContent([
+  onStep?.(`Asking Gemini (${Math.round(blob.size / 1024)} KB)...`);
+  const result = await withTimeout(cloudModel.generateContent([
     prompt,
     { inlineData: { mimeType: "application/pdf", data: await toBase64(blob) } },
-  ]);
+  ]), 90000, "Gemini");
   return result.response.text().trim();
 }
 
@@ -32,4 +34,14 @@ function toBase64(blob) {
     r.onerror = () => reject(r.error);
     r.readAsDataURL(blob);
   });
+}
+
+// Gives up after `ms` so the button never spins forever.
+function withTimeout(promise, ms, what) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${what} took too long (over ${ms / 1000}s).`)), ms)
+    ),
+  ]);
 }

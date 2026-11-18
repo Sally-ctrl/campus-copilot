@@ -257,7 +257,11 @@ function summaryBlock(it) {
     btn.disabled = true;
     btn.textContent = "Summarizing in the cloud...";
     try {
-      it.summary = await summarizePdf(it.link, { course: it.course, title: it.title });
+      it.summary = await summarizePdf(it.link, {
+        course: it.course,
+        title: it.title,
+        onStep: (msg) => (btn.textContent = msg),
+      });
       setStatus("in_cloud");
       openSummaries.add(it.id);
       await save();
