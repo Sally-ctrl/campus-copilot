@@ -13,11 +13,17 @@ const IMAGE_WIDTH = 900;        // px; enough to read a circuit or FSM
 // 1) Download the PDF with your CMS login.
 // 2) On the laptop: pull out the text, and turn diagram slides into small images.
 // 3) Summarize: Nano if it's short and has no diagrams, otherwise Gemini in the cloud.
-export async function summarizePdf(url, { course, title, onStep } = {}) {
-  onStep?.("Downloading PDF...");
-  const res = await withTimeout(fetch(url, { credentials: "include" }), 30000, "PDF download");
-  if (!res.ok) throw new Error(`Couldn't download the PDF (${res.status}).`);
-  const data = new Uint8Array(await res.arrayBuffer());
+// `source` is a CMS link, or { blob } for a PDF you uploaded yourself.
+export async function summarizePdf(source, { course, title, onStep } = {}) {
+  let data;
+  if (typeof source === "string") {
+    onStep?.("Downloading PDF...");
+    const res = await withTimeout(fetch(source, { credentials: "include" }), 30000, "PDF download");
+    if (!res.ok) throw new Error(`Couldn't download the PDF (${res.status}).`);
+    data = new Uint8Array(await res.arrayBuffer());
+  } else {
+    data = new Uint8Array(await source.blob.arrayBuffer());
+  }
 
   onStep?.("Reading slides on your laptop...");
   const { slides, diagrams } = await readSlides(data, onStep);

@@ -11,6 +11,13 @@
     <span id="status" class="badge">Idle</span>
   </header>
 
+  <nav class="tabs">
+    <button class="tab active" data-tab="tabList">My list</button>
+    <button class="tab" data-tab="tabAdd">Add</button>
+  </nav>
+
+  <div id="tabList">
+
   <div class="row">
     <button id="readBtn">Scan this page</button>
     <button id="syncBtn" class="secondary">Sync all courses</button>
@@ -63,6 +70,58 @@
   </div>
 
   <p id="empty" class="muted">No items yet. Open a course page and click "Scan this page", or open your Courses list and click "Sync all courses".</p>
+
+  </div>
+
+  <div id="tabAdd" style="display:none">
+    <datalist id="courseList"></datalist>
+
+    <section>
+      <h2>Add a deadline</h2>
+      <form id="deadlineForm" class="form">
+        <label>Title <input name="title" required placeholder="e.g. Project milestone 3" /></label>
+        <div class="two">
+          <label>Course <input name="course" list="courseList" placeholder="e.g. CSEN605" /></label>
+          <label>Type
+            <select name="type">
+              <option value="quiz">Quiz</option><option value="exam">Exam</option>
+              <option value="assignment">Assignment</option><option value="project">Project</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+        <div class="two">
+          <label>Date <input name="date" type="date" required /></label>
+          <label>Time <input name="time" type="time" /></label>
+        </div>
+        <label>Hall / place <input name="place" placeholder="e.g. Exam Hall 3" /></label>
+        <label>What's on it? <input name="coverage" placeholder='e.g. "lectures 7-9" or "FSM and VHDL"' /></label>
+        <label>Notes <textarea name="notes" rows="2" placeholder="Anything else: bring a calculator, open book..."></textarea></label>
+        <button type="submit">Add deadline</button>
+        <p class="form-msg muted"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Upload material</h2>
+      <form id="materialForm" class="form">
+        <label>PDF file <input name="file" type="file" accept="application/pdf" required /></label>
+        <label>Title <input name="title" placeholder="Defaults to the file name" /></label>
+        <div class="two">
+          <label>Course <input name="course" list="courseList" placeholder="e.g. CSEN605" /></label>
+          <label>Type
+            <select name="type">
+              <option>My notes</option><option>Lecture slides</option><option>Past exam</option>
+              <option>Sheet</option><option>Other</option>
+            </select>
+          </label>
+        </div>
+        <label>Week of <input name="date" type="date" /></label>
+        <button type="submit">Upload</button>
+        <p class="form-msg muted">Stays on your laptop. Gets a summary, shows up in search, and can be part of a quiz.</p>
+      </form>
+    </section>
+  </div>
 
   <script type="module" src="./src/sidepanel.js"></script>
 </body>

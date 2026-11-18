@@ -62,3 +62,12 @@ button.mic.live { background: #c23b3b; animation: pulse 1s ease-in-out infinite;
 .fill.behind { background: #e05050; }
 .meta.warn { color: #ff9a7a; }
 .meta a { color: #8fb0ff; }
+.tabs { display: flex; gap: 6px; margin-top: 12px; border-bottom: 1px solid #2a2a2a; }
+.tab { flex: none; width: auto; background: none; color: #999; border-radius: 0; padding: 8px 12px; border-bottom: 2px solid transparent; }
+.tab.active { color: #fff; border-bottom-color: #4f7cff; }
+.form label { margin-top: 10px; }
+.form button { margin-top: 12px; width: 100%; }
+.two { display: flex; gap: 8px; }
+.two label { flex: 1; min-width: 0; }
+select, textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1c1c1c; color: #eee; font: inherit; }
+.form-msg { margin-top: 8px; }

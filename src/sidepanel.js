@@ -5,6 +5,7 @@ import { summarizePdf } from "./summary.js";
 import { keywordSearch, smartSearch } from "./search.js";
 import { runCommand } from "./commands.js";
 import { findCoverage, readiness } from "./coverage.js";
+import { saveFile, getFile, clearFiles } from "./files.js";
 import { ensureMicPermission, startRecording, stopRecording, isRecording } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -47,6 +48,7 @@ $("perDayInput").addEventListener("change", async (e) => {
 
 $("clearBtn").addEventListener("click", async () => {
   items = [];
+  await clearFiles();
   await save();
   render();
 });
@@ -249,10 +251,17 @@ function renderList(el, list, { deadline = false } = {}) {
 
     const body = document.createElement("div");
     body.className = "body";
-    const title = document.createElement(it.link ? "a" : "div");
+    const title = document.createElement(it.link || it.localFile ? "a" : "div");
     title.className = "title";
     title.textContent = it.title;
-    if (it.link) {
+    if (it.localFile) {
+      title.href = "#";
+      title.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const blob = await getFile(it.localFile);
+        if (blob) chrome.tabs.create({ url: URL.createObjectURL(blob) });
+      });
+    } else if (it.link) {
       title.href = it.link;
       title.addEventListener("click", (e) => {
         e.preventDefault();
@@ -379,7 +388,8 @@ function getSummary(it, onStep) {
   if (pending.has(it.id)) return pending.get(it.id);
   const job = (async () => {
     try {
-      const { summary, difficulty, minutes, source } = await summarizePdf(it.link, {
+      const src = it.localFile ? { blob: await getFile(it.localFile) } : it.link;
+      const { summary, difficulty, minutes, source } = await summarizePdf(src, {
         course: it.course,
         title: it.title,
         onStep,
@@ -404,7 +414,7 @@ function getSummary(it, onStep) {
   return job;
 }
 
-const isPdf = (it) => it.link && /\.pdf($|\?)/i.test(it.link);
+const isPdf = (it) => it.localFile || (it.link && /\.pdf($|\?)/i.test(it.link));
 
 // After a scan/sync: quietly prepare summaries for this week's lecture PDFs.
 // Gentle on the free tier: one at a time, a pause between them, and if Google
@@ -507,6 +517,100 @@ function renderChips() {
     });
     el.append(chip);
   }
+}
+
+// ---------- tabs ----------
+for (const tab of document.querySelectorAll(".tab")) {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
+    $("tabList").style.display = tab.dataset.tab === "tabList" ? "block" : "none";
+    $("tabAdd").style.display = tab.dataset.tab === "tabAdd" ? "block" : "none";
+  });
+}
+
+const cleanCourse = (c) => (c ?? "").trim().toUpperCase().replace(/\s+/g, "") || null;
+
+// ---------- Add tab: deadline form ----------
+$("deadlineForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const msg = e.target.querySelector(".form-msg");
+  const dl = {
+    id: crypto.randomUUID(),
+    manual: true,
+    kind: "deadline",
+    type: f.get("type"),
+    title: f.get("title").trim(),
+    course: cleanCourse(f.get("course")),
+    date: f.get("date") || null,
+    time: f.get("time") || null,
+    details: [f.get("place"), f.get("notes")].map((x) => x?.trim()).filter(Boolean).join(" · ") || null,
+    done: false,
+  };
+
+  const coverageText = f.get("coverage")?.trim();
+  if (coverageText && dl.course) {
+    msg.textContent = "Finding the materials it covers...";
+    startNano();
+    try {
+      const materials = items.filter((x) => x.kind === "coursework" && x.course === dl.course);
+      const found = await findCoverage(coverageText, materials);
+      if (found.length) {
+        dl.coverage = found.map((x) => x.id);
+        dl.coverageText = coverageText;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  items.push(dl);
+  await save();
+  render();
+  e.target.reset();
+  msg.textContent = `Added "${dl.title}"${dl.coverage ? ` (covers ${dl.coverage.length} item(s))` : ""}.`;
+});
+
+// ---------- Add tab: upload material ----------
+$("materialForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const msg = e.target.querySelector(".form-msg");
+  const file = f.get("file");
+  if (!file?.size) return;
+  if (file.size > 30 * 1024 * 1024) {
+    msg.textContent = "That PDF is over 30 MB. Try a smaller one.";
+    return;
+  }
+
+  const id = crypto.randomUUID();
+  await saveFile(id, file);
+  const it = {
+    id,
+    manual: true,
+    localFile: id,
+    kind: "coursework",
+    type: f.get("type"),
+    title: f.get("title")?.trim() || file.name.replace(/\.pdf$/i, ""),
+    course: cleanCourse(f.get("course")),
+    date: f.get("date") || new Date().toISOString().slice(0, 10),
+    opened: true,
+    done: false,
+  };
+  items.push(it);
+  await save();
+  render();
+  e.target.reset();
+  msg.textContent = `Uploaded "${it.title}". Preparing its summary...`;
+  getSummary(it)
+    .then(() => (msg.textContent = `"${it.title}" is ready, with a summary.`))
+    .catch((err) => (msg.textContent = `Uploaded, but the summary failed: ${err.message}`))
+    .finally(render);
+});
+
+function renderCourseList() {
+  const courses = [...new Set(items.map((x) => x.course).filter(Boolean))].sort();
+  $("courseList").innerHTML = courses.map((c) => `<option value="${c}"></option>`).join("");
 }
 
 // ---------- commands (typed + voice) ----------
@@ -627,6 +731,7 @@ function renderSearch() {
 
 function render() {
   renderChips();
+  renderCourseList();
   renderSearch();
   const visible = filtered();
   const byDate = (a, b) =>
