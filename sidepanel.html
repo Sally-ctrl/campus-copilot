@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Campus Copilot</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Campus Copilot</h1>
+    <span id="status" class="badge">Idle</span>
+  </header>
+
+  <button id="readBtn">Find tasks on this page</button>
+  <p id="progress" class="muted"></p>
+
+  <h2>To-do</h2>
+  <ul id="taskList"></ul>
+  <p id="empty" class="muted">No tasks yet. Open your portal and click the button.</p>
+
+  <script type="module" src="./src/sidepanel.js"></script>
+</body>
+</html>
