@@ -2,6 +2,7 @@ import { initDeviceModel } from "./ai.js";
 import { extractDeadlines } from "./tasks.js";
 import { readCmsPage } from "./cms.js";
 import { summarizePdf } from "./summary.js";
+import { keywordSearch, smartSearch } from "./search.js";
 
 const $ = (id) => document.getElementById(id);
 let items = [];
@@ -219,7 +220,7 @@ function renderList(el, list, { deadline = false } = {}) {
   el.innerHTML = "";
   for (const it of list) {
     const li = document.createElement("li");
-    if (deadline) li.classList.add("deadline");
+    if (deadline || it.kind === "deadline") li.classList.add("deadline");
     if (deadline && it.date && daysUntil(it.date) <= 2 && daysUntil(it.date) >= 0) li.classList.add("soon");
     if (it.done) li.classList.add("done");
 
@@ -410,9 +411,60 @@ function renderChips() {
   }
 }
 
+// ---------- search ----------
+let query = "";
+let smartResults = null; // set after pressing Enter
+
+$("searchInput").addEventListener("input", (e) => {
+  query = e.target.value.trim();
+  smartResults = null;
+  render();
+});
+
+$("searchInput").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter" || !query) return;
+  startNano();
+  $("searchTitle").textContent = "Thinking on your laptop...";
+  try {
+    const { results, source } = await smartSearch(filtered(), query);
+    smartResults = { results, source };
+    if (source) setStatus(source);
+  } catch (err) {
+    console.error(err);
+    smartResults = { results: [], error: err.message };
+  }
+  render();
+});
+
+const filtered = () => items.filter((x) => courseFilter === "ALL" || x.course === courseFilter);
+
+function renderSearch() {
+  const searching = query.length > 0;
+  $("searchSection").style.display = searching ? "block" : "none";
+  $("mainLists").style.display = searching ? "none" : "block";
+  if (!searching) return;
+
+  let list, title;
+  if (smartResults) {
+    list = smartResults.results;
+    const where = String(smartResults.source ?? "").includes("cloud") ? "cloud" : "on your laptop";
+    title = `Smart matches (${where})`;
+    $("searchEmpty").textContent = smartResults.error
+      ? "Smart search failed: " + smartResults.error
+      : list.length ? "" : "No close matches.";
+  } else {
+    list = keywordSearch(filtered(), query);
+    title = `Matches (${list.length})`;
+    $("searchEmpty").textContent = list.length ? "" : "No exact matches. Press Enter for smart search.";
+  }
+  $("searchTitle").textContent = title;
+  renderList($("searchList"), list, {});
+}
+
 function render() {
   renderChips();
-  const visible = items.filter((x) => courseFilter === "ALL" || x.course === courseFilter);
+  renderSearch();
+  const visible = filtered();
   const byDate = (a, b) =>
     (a.date ?? "9999").localeCompare(b.date ?? "9999") || (a.time ?? "").localeCompare(b.time ?? "");
 

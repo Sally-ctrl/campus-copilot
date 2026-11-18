@@ -46,3 +46,4 @@ button.small { flex: none; width: auto; margin-top: 8px; padding: 4px 10px; font
 .level.easy { background: #1f4d33; color: #a8e6c1; }
 .level.medium { background: #5a4410; color: #f5d488; }
 .level.hard { background: #5a1f1f; color: #f5a8a8; }
+input.search { margin-top: 12px; }
