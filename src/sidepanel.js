@@ -1,5 +1,6 @@
 import { initDeviceModel } from "./ai.js";
-import { extractItems, detectCourse } from "./tasks.js";
+import { extractDeadlines } from "./tasks.js";
+import { readCmsPage } from "./cms.js";
 
 const $ = (id) => document.getElementById(id);
 let items = [];
@@ -28,13 +29,9 @@ $("clearBtn").addEventListener("click", async () => {
   render();
 });
 
-// ---------- reading pages ----------
-function readPage() {
-  return { text: document.body.innerText, title: document.title, url: location.href };
-}
-
+// ---------- reading CMS tabs ----------
 async function readTab(tabId) {
-  const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: readPage });
+  const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: readCmsPage });
   return result;
 }
 
@@ -55,7 +52,6 @@ async function readUrlInBackground(url) {
     };
     chrome.tabs.onUpdated.addListener(listener);
   });
-  await new Promise((r) => setTimeout(r, 1000)); // let the page finish rendering
   try {
     return await readTab(tab.id);
   } finally {
@@ -63,13 +59,18 @@ async function readUrlInBackground(url) {
   }
 }
 
-// ---------- merge new items without duplicates ----------
-const keyOf = (x) => `${x.course}|${x.title}|${x.date}`.toLowerCase();
+// ---------- merging ----------
+// Materials are matched by their CMS id; deadlines by course + title + date.
+const keyOf = (x) =>
+  x.cmsId ? `cms:${x.cmsId}` : `${x.course}|${x.title}|${x.date}`.toLowerCase();
 
 function merge(found) {
   let added = 0;
   for (const it of found) {
-    if (!items.some((x) => keyOf(x) === keyOf(it))) {
+    const old = items.find((x) => keyOf(x) === keyOf(it));
+    if (old) {
+      Object.assign(old, { ...it, id: old.id, done: old.done }); // refresh, keep "done"
+    } else {
       items.push({ ...it, id: crypto.randomUUID(), done: false });
       added++;
     }
@@ -77,15 +78,22 @@ function merge(found) {
   return added;
 }
 
-async function scanPage(page, label = "") {
-  const course = detectCourse(page.text);
-  const { items: found, source } = await extractItems(page.text, {
+// One course page: materials straight from the HTML, deadlines via AI.
+async function scanCourse(page, label = "") {
+  if (!page.materials.length && !page.announcements.length) {
+    throw new Error("This doesn't look like a CMS course page.");
+  }
+  const course = page.code;
+  const materials = page.materials.map((m) => ({ ...m, kind: "coursework", course }));
+
+  $("progress").textContent = `${label}Reading ${course} announcements...`;
+  const { items: deadlines, source } = await extractDeadlines(page.announcements.join("\n\n"), {
     course,
     group,
-    onChunk: (i, n) => ($("progress").textContent = `${label}Reading ${course ?? "page"} (part ${i}/${n})...`),
   });
   if (source) setStatus(source);
-  return merge(found);
+
+  return merge([...materials, ...deadlines]);
 }
 
 // ---------- buttons ----------
@@ -113,10 +121,10 @@ $("readBtn").addEventListener("click", () =>
   busy(async () => {
     startNano();
     const page = await readTab((await activeTab()).id);
-    const added = await scanPage(page);
+    const added = await scanCourse(page);
     await save();
     render();
-    $("progress").textContent = `Done. ${added} new item(s).`;
+    $("progress").textContent = `Done. ${added} new item(s) from ${page.code}.`;
   })
 );
 
@@ -137,8 +145,9 @@ $("syncBtn").addEventListener("click", () =>
     }
     let added = 0;
     for (let i = 0; i < links.length; i++) {
+      $("progress").textContent = `Course ${i + 1}/${links.length}: opening...`;
       const page = await readUrlInBackground(links[i]);
-      added += await scanPage(page, `Course ${i + 1}/${links.length}: `);
+      added += await scanCourse(page, `Course ${i + 1}/${links.length}: `);
       await save();
       render();
     }
@@ -154,16 +163,21 @@ function setStatus(source) {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-
-function daysUntil(date) {
-  return Math.round((new Date(date) - new Date(today())) / 86400000);
-}
+const daysUntil = (date) => Math.round((new Date(date) - new Date(today())) / 86400000);
 
 function whenLabel(it) {
   if (!it.date) return "";
+  if (it.kind === "coursework") return `Week of ${it.date}`;
   const d = daysUntil(it.date);
   const rel = d === 0 ? "today" : d === 1 ? "tomorrow" : d > 1 ? `in ${d} days` : `${-d} days ago`;
   return `${it.date}${it.time ? " " + it.time : ""} · ${rel}`;
+}
+
+// Deadlines are past after their date; coursework after its week ends.
+function isPast(x) {
+  if (x.done) return true;
+  if (!x.date) return false;
+  return x.kind === "coursework" ? daysUntil(x.date) < -6 : daysUntil(x.date) < 0;
 }
 
 function renderList(el, list, { deadline = false } = {}) {
@@ -176,7 +190,6 @@ function renderList(el, list, { deadline = false } = {}) {
 
     const box = document.createElement("input");
     box.type = "checkbox";
-    box.style.width = "auto";
     box.checked = it.done;
     box.addEventListener("change", async () => {
       it.done = box.checked;
@@ -185,12 +198,26 @@ function renderList(el, list, { deadline = false } = {}) {
     });
 
     const body = document.createElement("div");
-    const title = document.createElement("div");
+    body.className = "body";
+    const title = document.createElement(it.link ? "a" : "div");
     title.className = "title";
     title.textContent = it.title;
+    if (it.link) {
+      title.href = it.link;
+      title.addEventListener("click", (e) => {
+        e.preventDefault();
+        chrome.tabs.create({ url: it.link });
+      });
+    }
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = [it.course, it.type, it.details].filter(Boolean).join(" · ");
+    if (it.kind === "coursework" && !it.opened && !it.done) {
+      const tag = document.createElement("span");
+      tag.className = "new";
+      tag.textContent = "NEW";
+      meta.prepend(tag);
+    }
     const when = document.createElement("div");
     when.className = "when";
     when.textContent = whenLabel(it);
@@ -219,12 +246,9 @@ function renderChips() {
 
 function render() {
   renderChips();
-  const t = today();
   const visible = items.filter((x) => courseFilter === "ALL" || x.course === courseFilter);
   const byDate = (a, b) =>
     (a.date ?? "9999").localeCompare(b.date ?? "9999") || (a.time ?? "").localeCompare(b.time ?? "");
-
-  const isPast = (x) => x.done || (x.date && x.date < t);
 
   const deadlines = visible.filter((x) => x.kind === "deadline" && !isPast(x)).sort(byDate);
   const next = visible.filter((x) => x.kind !== "deadline" && !isPast(x)).sort(byDate);

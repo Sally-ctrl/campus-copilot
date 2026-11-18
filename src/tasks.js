@@ -1,69 +1,39 @@
 import { model } from "./ai.js";
 
-// Nano's input limit is ~9k tokens, so long pages are split into chunks.
-const CHUNK_CHARS = 5000;
-const MAX_CHUNKS = 8;
+// Nano's input limit is ~9k tokens; announcements are usually short.
+const MAX_CHARS = 6000;
 
-function buildPrompt(chunk, course, group) {
+function buildPrompt(text, course, group) {
   const today = new Date().toISOString().slice(0, 10);
-  return `Today is ${today}. This text is from a university course page${course ? ` for course ${course}` : ""}.
-List the items in it as a JSON array. Each item:
-{"title": string,
- "kind": "deadline" or "coursework",
- "type": "quiz" | "exam" | "assignment" | "project" | "lecture" | "tutorial" | "lab" | "other",
- "date": "YYYY-MM-DD" or null,
- "time": "HH:MM" (24h) or null,
- "details": short string or null}
-
-Rules:
-- "deadline" = a graded event with a date: quiz, midterm, final exam, graded assignment or project submission.
-- "coursework" = course material: lectures, tutorials, practice assignments, labs, slides, files. Use its week/posting date if shown.
-- Practice assignments and tutorial sheets are coursework, not deadlines.
+  return `Today is ${today}. These are announcements from university course ${course ?? ""}.
+List ONLY graded events with a date: quizzes, midterms, finals, exams, project or assignment submissions.
+Ignore office hours, materials, lectures and general info.
+Reply with ONLY a JSON array. Each item:
+{"title": string, "type": "quiz" | "exam" | "assignment" | "project" | "other",
+ "date": "YYYY-MM-DD" or null, "time": "HH:MM" (24h, start time) or null, "details": short string or null}
 - If a date has no year, pick the year that makes it closest to today.
 ${group ? `- The student is in tutorial group ${group}. If times or halls differ per group, use ONLY the slot for ${group} and put the hall in "details".` : ""}
-- Reply with ONLY the JSON array. If nothing, reply [].
+- If nothing qualifies, reply [].
 
-TEXT:
-${chunk}`;
+ANNOUNCEMENTS:
+${text.slice(0, MAX_CHARS)}`;
 }
 
-// Extracts items from one page's text. Returns { items, source }.
-export async function extractItems(pageText, { course, group, onChunk } = {}) {
-  const chunks = [];
-  for (let i = 0; i < pageText.length && chunks.length < MAX_CHUNKS; i += CHUNK_CHARS) {
-    chunks.push(pageText.slice(i, i + CHUNK_CHARS));
-  }
-
-  const items = [];
-  let source = null;
-  for (let i = 0; i < chunks.length; i++) {
-    onChunk?.(i + 1, chunks.length);
-    const result = await model.generateContent(buildPrompt(chunks[i], course, group));
-    source = result.response.inferenceSource ?? source;
-    for (const it of parseJsonArray(result.response.text())) {
-      items.push(clean({ ...it, course: course ?? it.course ?? null }));
-    }
-  }
-  return { items, source };
+// AI step: announcements text -> deadline items. Returns { items, source }.
+export async function extractDeadlines(text, { course, group } = {}) {
+  if (!text.trim()) return { items: [], source: null };
+  const result = await model.generateContent(buildPrompt(text, course, group));
+  const items = parseJsonArray(result.response.text()).map((it) =>
+    fixDate({ ...it, kind: "deadline", course })
+  );
+  return { items, source: result.response.inferenceSource ?? null };
 }
 
-// Fixes common model mistakes: unpadded dates ("2026-11-7") and
-// practice material wrongly marked as a deadline.
-const COURSEWORK_WORDS = /practice|solution|tutorial|lecture|lab|slides|sheet|notes|material/i;
-
-function clean(it) {
+// Models sometimes write "2026-11-7" instead of "2026-11-07".
+function fixDate(it) {
   const m = String(it.date ?? "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   it.date = m ? `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}` : null;
-  if (it.kind === "deadline" && COURSEWORK_WORDS.test(it.title) && !/quiz|exam|midterm|final/i.test(it.title)) {
-    it.kind = "coursework";
-  }
   return it;
-}
-
-// GUC course pages show the code like "(|CSEN605|)".
-export function detectCourse(text) {
-  const m = text.match(/\(\|\s*([A-Z]{2,5}\s?\d{3})\s*\|\)/);
-  return m ? m[1].replace(/\s/g, "") : null;
 }
 
 // Models sometimes wrap JSON in ```json fences or add extra words.
