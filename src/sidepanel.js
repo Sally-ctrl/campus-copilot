@@ -3,6 +3,8 @@ import { extractDeadlines } from "./tasks.js";
 import { readCmsPage } from "./cms.js";
 import { summarizePdf } from "./summary.js";
 import { keywordSearch, smartSearch } from "./search.js";
+import { runCommand } from "./commands.js";
+import { ensureMicPermission, startRecording, stopRecording, isRecording } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
 let items = [];
@@ -410,6 +412,72 @@ function renderChips() {
     el.append(chip);
   }
 }
+
+// ---------- commands (typed + voice) ----------
+async function handleCommand(input) {
+  const reply = $("cmdReply");
+  reply.textContent = input.audioBase64 ? "Understanding your voice (cloud)..." : "Thinking on your laptop...";
+  try {
+    const { intent, source } = await runCommand(items, input);
+    setStatus(source);
+    const where = String(source).includes("device") ? "on your laptop" : "cloud";
+
+    if ((intent.action === "done" || intent.action === "undo") && intent.targets.length) {
+      for (const t of intent.targets) t.done = intent.action === "done";
+    } else if (intent.action === "add" && intent.title) {
+      items.push({
+        id: crypto.randomUUID(),
+        kind: "deadline",
+        type: "reminder",
+        title: intent.title,
+        course: intent.course ?? null,
+        date: intent.date ?? null,
+        time: intent.time ?? null,
+        done: false,
+      });
+    }
+    await save();
+    render();
+    const heard = input.audioBase64 && intent.heard ? `Heard: "${intent.heard}". ` : "";
+    reply.textContent = `${heard}${intent.reply ?? "Done."} (${where})`;
+  } catch (err) {
+    console.error(err);
+    reply.textContent = "Sorry: " + err.message;
+  }
+}
+
+$("cmdInput").addEventListener("keydown", async (e) => {
+  const text = e.target.value.trim();
+  if (e.key !== "Enter" || !text) return;
+  startNano();
+  e.target.value = "";
+  await handleCommand({ text });
+});
+
+// Tap to start, tap again to stop (stops by itself after 10 seconds).
+let autoStop = null;
+$("micBtn").addEventListener("click", async () => {
+  const btn = $("micBtn");
+  if (isRecording()) {
+    clearTimeout(autoStop);
+    btn.classList.remove("live");
+    const audioBase64 = await stopRecording();
+    if (audioBase64) await handleCommand({ audioBase64 });
+    return;
+  }
+  if (!(await ensureMicPermission())) {
+    $("cmdReply").textContent = "Allow the microphone in the tab that just opened, then tap the mic again.";
+    return;
+  }
+  try {
+    await startRecording();
+    btn.classList.add("live");
+    $("cmdReply").textContent = "Listening... tap the mic again when you're done.";
+    autoStop = setTimeout(() => isRecording() && btn.click(), 10000);
+  } catch (err) {
+    $("cmdReply").textContent = "Couldn't use the microphone: " + err.message;
+  }
+});
 
 // ---------- search ----------
 let query = "";
