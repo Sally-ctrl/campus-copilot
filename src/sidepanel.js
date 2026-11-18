@@ -23,6 +23,7 @@ async function load() {
     }
   }
   group = data.group ?? "";
+  if (/^\d+$/.test(group)) group = "T" + group;
   $("groupInput").value = group;
   studyPerDay = data.studyPerDay ?? 120;
   $("perDayInput").value = studyPerDay;
@@ -32,6 +33,7 @@ const save = () => chrome.storage.local.set({ items });
 
 $("groupInput").addEventListener("change", async (e) => {
   group = e.target.value.trim().toUpperCase();
+  if (/^\d+$/.test(group)) group = "T" + group; // "14" -> "T14", like the CMS writes it
   e.target.value = group;
   await chrome.storage.local.set({ group });
 });
