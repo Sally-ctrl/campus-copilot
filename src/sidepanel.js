@@ -4,6 +4,7 @@ import { readCmsPage } from "./cms.js";
 import { summarizePdf } from "./summary.js";
 import { keywordSearch, smartSearch } from "./search.js";
 import { runCommand } from "./commands.js";
+import { findCoverage, readiness } from "./coverage.js";
 import { ensureMicPermission, startRecording, stopRecording, isRecording } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
@@ -13,7 +14,7 @@ let courseFilter = "ALL";
 
 // ---------- storage (local for now; Firestore comes with sign-in) ----------
 async function load() {
-  const data = await chrome.storage.local.get(["items", "group"]);
+  const data = await chrome.storage.local.get(["items", "group", "studyPerDay"]);
   items = data.items ?? [];
   // Old "busy" failures weren't the lecture's fault: let them be retried.
   for (const x of items) {
@@ -23,6 +24,8 @@ async function load() {
   }
   group = data.group ?? "";
   $("groupInput").value = group;
+  studyPerDay = data.studyPerDay ?? 120;
+  $("perDayInput").value = studyPerDay;
   render();
 }
 const save = () => chrome.storage.local.set({ items });
@@ -31,6 +34,13 @@ $("groupInput").addEventListener("change", async (e) => {
   group = e.target.value.trim().toUpperCase();
   e.target.value = group;
   await chrome.storage.local.set({ group });
+});
+
+$("perDayInput").addEventListener("change", async (e) => {
+  studyPerDay = Math.max(15, Number(e.target.value) || 120);
+  e.target.value = studyPerDay;
+  await chrome.storage.local.set({ studyPerDay });
+  render();
 });
 
 $("clearBtn").addEventListener("click", async () => {
@@ -267,11 +277,95 @@ function renderList(el, list, { deadline = false } = {}) {
     when.textContent = whenLabel(it);
     body.append(title, meta, when);
     if (isPdf(it)) body.append(summaryBlock(it));
+    if (it.kind === "deadline" && it.type !== "reminder" && !it.done) body.append(readinessBlock(it));
 
     li.append(box, body);
     el.append(li);
   }
 }
+
+// ---------- readiness ----------
+// You type what the quiz covers; we find those materials and score how ready you are.
+const editingCoverage = new Set();
+const coverageDrafts = new Map();
+
+function readinessBlock(dl) {
+  const wrap = document.createElement("div");
+  wrap.className = "ready";
+  const covered = (dl.coverage ?? []).map((id) => items.find((x) => x.id === id)).filter(Boolean);
+
+  if (!covered.length || editingCoverage.has(dl.id)) {
+    const input = document.createElement("input");
+    input.placeholder = 'What\'s on it? e.g. "lectures 7-9" or "FSM and VHDL"';
+    // Keep what you typed if the list refreshes in the background.
+    input.value = coverageDrafts.get(dl.id) ?? dl.coverageText ?? "";
+    input.addEventListener("input", () => coverageDrafts.set(dl.id, input.value));
+    const note = document.createElement("div");
+    note.className = "meta";
+    input.addEventListener("keydown", async (e) => {
+      if (e.key !== "Enter" || !input.value.trim()) return;
+      startNano();
+      note.textContent = "Finding those materials...";
+      const materials = items.filter((x) => x.kind === "coursework" && x.course === dl.course);
+      try {
+        const found = await findCoverage(input.value.trim(), materials);
+        if (!found.length) {
+          note.textContent = "Couldn't find matching materials in " + dl.course + ". Try lecture numbers.";
+          return;
+        }
+        dl.coverage = found.map((x) => x.id);
+        dl.coverageText = input.value.trim();
+        editingCoverage.delete(dl.id);
+        coverageDrafts.delete(dl.id);
+        await save();
+        render();
+      } catch (err) {
+        note.textContent = "Error: " + err.message;
+      }
+    });
+    wrap.append(input, note);
+    return wrap;
+  }
+
+  const r = readiness(dl, covered, { minutesPerDay: minutesPerDay() });
+  const bar = document.createElement("div");
+  bar.className = "bar";
+  const fill = document.createElement("div");
+  fill.className = "fill " + r.status;
+  fill.style.width = r.score + "%";
+  bar.append(fill);
+
+  const line = document.createElement("div");
+  line.className = "meta";
+  const label = { done: "✅ All studied", "on-track": "🟢 On track", tight: "🟡 Tight", behind: "🔴 Behind" }[r.status];
+  const h = Math.floor(r.minutesLeft / 60), m = r.minutesLeft % 60;
+  line.textContent = `${r.score}% ready · ${h ? h + "h " : ""}${m}m left to study · ${label}`;
+
+  const cov = document.createElement("div");
+  cov.className = "meta";
+  cov.textContent = "Covers: " + covered.map((x) => x.title).join(", ");
+  const edit = document.createElement("a");
+  edit.href = "#";
+  edit.textContent = " (edit)";
+  edit.addEventListener("click", (e) => {
+    e.preventDefault();
+    editingCoverage.add(dl.id);
+    render();
+  });
+  cov.append(edit);
+
+  wrap.append(bar, line, cov);
+  if (r.notOpened.length) {
+    const warn = document.createElement("div");
+    warn.className = "meta warn";
+    warn.textContent = "Not opened yet: " + r.notOpened.map((x) => x.title).join(", ");
+    wrap.append(warn);
+  }
+  return wrap;
+}
+
+let studyPerDay = 120;
+const minutesPerDay = () => studyPerDay;
 
 // ---------- summaries ----------
 // One shared function for the button and the background job, so the same
