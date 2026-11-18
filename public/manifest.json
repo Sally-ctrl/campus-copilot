@@ -2,10 +2,22 @@
   "manifest_version": 3,
   "name": "Campus Copilot",
   "version": "0.1.0",
-  "description": "Turns your university portal into a to-do list. Private by default with on-device Gemini Nano.",
-  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
-  "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js" },
-  "side_panel": { "default_path": "sidepanel.html" },
-  "action": { "default_title": "Open Campus Copilot" }
+  "description": "Turns your GUC CMS into a to-do list and quiz-prep assistant. Private by default with on-device Gemini Nano.",
+  "permissions": [
+    "sidePanel",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://cms.guc.edu.eg/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Campus Copilot"
+  }
 }

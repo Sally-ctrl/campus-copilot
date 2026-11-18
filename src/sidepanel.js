@@ -107,16 +107,42 @@ function startNano() {
   });
 }
 
+// ---------- only work on the CMS ----------
+// The extension only has permission for cms.guc.edu.eg, so on any other site
+// Chrome doesn't even tell us the URL. Buttons are enabled only on the CMS.
+const CMS_HOST = "cms.guc.edu.eg";
+let working = false;
+
+async function onCms() {
+  const tab = await activeTab();
+  try {
+    return new URL(tab?.url ?? "").hostname === CMS_HOST;
+  } catch {
+    return false;
+  }
+}
+
+async function updateButtons() {
+  const ok = await onCms();
+  $("readBtn").disabled = working || !ok;
+  $("syncBtn").disabled = working || !ok;
+  $("cmsHint").style.display = ok ? "none" : "block";
+}
+
+chrome.tabs.onActivated.addListener(updateButtons);
+chrome.tabs.onUpdated.addListener((_, info) => info.status === "complete" && updateButtons());
+
 async function busy(fn) {
-  const btns = [$("readBtn"), $("syncBtn")];
-  btns.forEach((b) => (b.disabled = true));
+  working = true;
+  await updateButtons();
   try {
     await fn();
   } catch (err) {
     console.error(err);
     $("progress").textContent = "Error: " + err.message;
   } finally {
-    btns.forEach((b) => (b.disabled = false));
+    working = false;
+    await updateButtons();
   }
 }
 
@@ -313,3 +339,4 @@ function render() {
 }
 
 load();
+updateButtons();
