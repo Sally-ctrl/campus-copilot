@@ -93,7 +93,9 @@ async function scanCourse(page, label = "") {
   });
   if (source) setStatus(source);
 
-  return merge([...materials, ...deadlines]);
+  // Each deadline links back to its course page so it can be checked in one click.
+  const linked = deadlines.map((d) => ({ ...d, link: page.url }));
+  return merge([...materials, ...linked]);
 }
 
 // ---------- buttons ----------
