@@ -567,6 +567,29 @@ function renderChips() {
   }
 }
 
+// ---------- light / dark mode ----------
+// Auto follows your computer's setting; the button cycles Auto -> Light -> Dark.
+const THEMES = ["auto", "light", "dark"];
+const THEME_LABEL = { auto: "◐ Auto", light: "☀ Light", dark: "☾ Dark" };
+let theme = "auto";
+
+function applyTheme() {
+  if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", theme);
+  $("themeBtn").textContent = THEME_LABEL[theme];
+}
+
+chrome.storage.local.get("theme").then((d) => {
+  theme = THEMES.includes(d.theme) ? d.theme : "auto";
+  applyTheme();
+});
+
+$("themeBtn").addEventListener("click", async () => {
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  applyTheme();
+  await chrome.storage.local.set({ theme });
+});
+
 // ---------- tabs ----------
 for (const tab of document.querySelectorAll(".tab")) {
   tab.addEventListener("click", () => {
