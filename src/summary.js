@@ -1,4 +1,4 @@
-import { cloudModel } from "./ai.js";
+import { cloudModel, withTimeout } from "./ai.js";
 
 // Downloads a lecture PDF (using your CMS login in Chrome) and asks
 // Gemini in the cloud for a short summary + likely quiz topics.
@@ -18,11 +18,11 @@ SUMMARY
 LIKELY QUIZ TOPICS
 - 3 to 5 bullets: what a quiz on this lecture would most likely ask.`;
 
-  onStep?.(`Asking Gemini (${Math.round(blob.size / 1024)} KB)...`);
-  const result = await withTimeout(cloudModel.generateContent([
+  const kb = Math.round(blob.size / 1024);
+  const result = await cloudModel.generateContent([
     prompt,
     { inlineData: { mimeType: "application/pdf", data: await toBase64(blob) } },
-  ]), 90000, "Gemini");
+  ], { onModel: (name) => onStep?.(`Asking ${name} (${kb} KB)...`) });
   return result.response.text().trim();
 }
 
@@ -34,14 +34,4 @@ function toBase64(blob) {
     r.onerror = () => reject(r.error);
     r.readAsDataURL(blob);
   });
-}
-
-// Gives up after `ms` so the button never spins forever.
-function withTimeout(promise, ms, what) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${what} took too long (over ${ms / 1000}s).`)), ms)
-    ),
-  ]);
 }

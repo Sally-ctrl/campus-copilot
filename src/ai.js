@@ -29,8 +29,9 @@ export const model = getGenerativeModel(ai, {
 
 // Cloud-only model for heavy jobs (PDF summaries, study plans).
 // Big files and long outputs are too much for Nano, so these always go to the cloud.
-// Tried in order: if a model is overloaded or unavailable, the next one is used.
-const CLOUD_MODELS = ["gemini-4-hydrogen", "gemini-3.5-flash-lite"];
+// Tried in order: fast model first; if it's busy, slow or unavailable, the next one is used.
+const CLOUD_MODELS = ["gemini-3.5-flash-lite", "gemini-4-hydrogen"];
+const PER_MODEL_TIMEOUT = 40000;
 
 const cloudModels = CLOUD_MODELS.map((name) => ({
   name,
@@ -38,23 +39,33 @@ const cloudModels = CLOUD_MODELS.map((name) => ({
 }));
 
 export const cloudModel = {
-  async generateContent(request) {
+  async generateContent(request, { onModel } = {}) {
     let lastErr;
     for (const { name, model } of cloudModels) {
+      onModel?.(name);
       try {
-        const result = await model.generateContent(request);
+        const result = await withTimeout(model.generateContent(request), PER_MODEL_TIMEOUT, name);
         result.modelName = name;
         return result;
       } catch (err) {
         lastErr = err;
-        // Only fall back on "busy / not found / rate limit" errors.
-        if (!/\b(500|503|429|404)\b|high demand|overloaded|not found/i.test(err.message)) throw err;
+        // Fall back only on "busy / slow / not found / rate limit" errors.
+        if (!/\b(500|503|429|404)\b|high demand|overloaded|not found|too long/i.test(err.message)) throw err;
         console.warn(`${name} failed, trying next model:`, err.message);
       }
     }
     throw lastErr;
   },
 };
+
+export function withTimeout(promise, ms, what) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${what} took too long (over ${ms / 1000}s).`)), ms)
+    ),
+  ]);
+}
 
 // Must be called from a user action (button click) before the first prompt.
 let deviceInitStarted = false;
