@@ -1,6 +1,7 @@
 import { initDeviceModel } from "./ai.js";
 import { extractDeadlines } from "./tasks.js";
 import { readCmsPage } from "./cms.js";
+import { summarizePdf } from "./summary.js";
 
 const $ = (id) => document.getElementById(id);
 let items = [];
@@ -224,10 +225,51 @@ function renderList(el, list, { deadline = false } = {}) {
     when.className = "when";
     when.textContent = whenLabel(it);
     body.append(title, meta, when);
+    if (it.link && /\.pdf($|\?)/i.test(it.link)) body.append(summaryBlock(it));
 
     li.append(box, body);
     el.append(li);
   }
+}
+
+// "Summarize" button + the saved summary (saved, so it works offline later).
+const openSummaries = new Set();
+
+function summaryBlock(it) {
+  const wrap = document.createElement("div");
+  const btn = document.createElement("button");
+  btn.className = "small";
+  btn.textContent = it.summary ? (openSummaries.has(it.id) ? "Hide summary" : "Show summary") : "Summarize (cloud)";
+  wrap.append(btn);
+
+  if (it.summary && openSummaries.has(it.id)) {
+    const box = document.createElement("div");
+    box.className = "summary";
+    box.textContent = it.summary;
+    wrap.append(box);
+  }
+
+  btn.addEventListener("click", async () => {
+    if (it.summary) {
+      openSummaries.has(it.id) ? openSummaries.delete(it.id) : openSummaries.add(it.id);
+      return render();
+    }
+    btn.disabled = true;
+    btn.textContent = "Summarizing in the cloud...";
+    try {
+      it.summary = await summarizePdf(it.link, { course: it.course, title: it.title });
+      setStatus("in_cloud");
+      openSummaries.add(it.id);
+      await save();
+    } catch (err) {
+      console.error(err);
+      btn.textContent = "Failed: " + err.message;
+      btn.disabled = false;
+      return;
+    }
+    render();
+  });
+  return wrap;
 }
 
 function renderChips() {

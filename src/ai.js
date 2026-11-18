@@ -27,6 +27,13 @@ export const model = getGenerativeModel(ai, {
   inCloudParams: { model: "gemini-4-hydrogen" },
 });
 
+// Cloud-only model for heavy jobs (PDF summaries, study plans).
+// Big files and long outputs are too much for Nano, so these always go to the cloud.
+export const cloudModel = getGenerativeModel(ai, {
+  mode: InferenceMode.ONLY_IN_CLOUD,
+  inCloudParams: { model: "gemini-4-hydrogen" },
+});
+
 // Must be called from a user action (button click) before the first prompt.
 let deviceInitStarted = false;
 export function initDeviceModel(onProgress) {

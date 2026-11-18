@@ -1,0 +1,35 @@
+import { cloudModel } from "./ai.js";
+
+// Downloads a lecture PDF (using your CMS login in Chrome) and asks
+// Gemini in the cloud for a short summary + likely quiz topics.
+export async function summarizePdf(url, { course, title } = {}) {
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error(`Couldn't download the PDF (${res.status}).`);
+  const blob = await res.blob();
+  if (blob.size > 15 * 1024 * 1024) throw new Error("PDF is too big (over 15 MB).");
+
+  const prompt = `This is "${title}" from university course ${course ?? ""}.
+Write for a student revising for a quiz. Plain text, no markdown symbols except "- " bullets.
+
+SUMMARY
+- 5 to 7 bullets with the main ideas, short and clear.
+
+LIKELY QUIZ TOPICS
+- 3 to 5 bullets: what a quiz on this lecture would most likely ask.`;
+
+  const result = await cloudModel.generateContent([
+    prompt,
+    { inlineData: { mimeType: "application/pdf", data: await toBase64(blob) } },
+  ]);
+  return result.response.text().trim();
+}
+
+// Blob -> base64 string (without the "data:...;base64," prefix).
+function toBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1]);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
