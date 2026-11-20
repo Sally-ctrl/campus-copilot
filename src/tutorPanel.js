@@ -8,7 +8,77 @@ export function initTutor(app) {
   const today = () => new Date().toISOString().slice(0, 10);
 
   let session = null; // { holder, questions, i, correct, answered, wrong: [] }
-  const history = [];
+
+  // ---------- several saved chats ----------
+  // Each chat: { id, title, target, history: [{ q, a, photo, refs }] }. Kept in chrome.storage.
+  let chats = [];
+  let current = null;
+  const saveChats = () => chrome.storage.local.set({ tutorChats: chats, tutorCurrent: current?.id ?? null });
+
+  function newChat() {
+    current = { id: crypto.randomUUID(), title: "New chat", target: $("tutorTarget").value || "", history: [] };
+    chats.unshift(current);
+    showChat();
+    saveChats();
+  }
+
+  function fillChatPicker() {
+    $("chatPicker").innerHTML = chats
+      .map((c) => `<option value="${c.id}">${esc(c.title)}${c.history.length ? ` (${c.history.length})` : ""}</option>`)
+      .join("");
+    if (current) $("chatPicker").value = current.id;
+  }
+
+  // Redraws the log from the saved messages (slide pictures only show for new answers).
+  function showChat() {
+    fillChatPicker();
+    const log = $("chatLog");
+    log.innerHTML = "";
+    for (const m of current.history) {
+      log.append(el("div", "bubble you", m.q + (m.photo ? "  📷" : "")));
+      const bot = el("div", "bubble tutor", m.a);
+      if (m.refs) bot.append(el("div", "meta", m.refs));
+      log.append(bot);
+    }
+    if (current.target && [...$("tutorTarget").options].some((o) => o.value === current.target)) {
+      $("tutorTarget").value = current.target;
+      $("tutorTarget").dispatchEvent(new Event("change"));
+    }
+    $("chatHint").textContent = current.history.length
+      ? "Continuing this chat. Start a new one for a different topic."
+      : "Uses the slides of what you picked above. Paste or attach a photo of your work to get it checked.";
+  }
+
+  chrome.storage.local.get(["tutorChats", "tutorCurrent"]).then((d) => {
+    chats = d.tutorChats ?? [];
+    current = chats.find((c) => c.id === d.tutorCurrent) ?? chats[0];
+    if (current) showChat();
+    else newChat();
+  });
+
+  $("newChatBtn").onclick = () => {
+    if (current && !current.history.length) return showChat(); // already on an empty chat
+    newChat();
+  };
+  $("delChatBtn").onclick = () => {
+    if (current.history.length && !confirmDelete()) return;
+    chats = chats.filter((c) => c.id !== current.id);
+    current = chats[0];
+    if (current) { showChat(); saveChats(); } else newChat();
+  };
+  // Two clicks to delete, no browser dialog (dialogs block the side panel).
+  let armed = 0;
+  function confirmDelete() {
+    if (Date.now() - armed < 3000) return true;
+    armed = Date.now();
+    $("chatHint").textContent = "Click 🗑 again to delete this chat.";
+    return false;
+  }
+  $("chatPicker").onchange = () => {
+    current = chats.find((c) => c.id === $("chatPicker").value);
+    showChat();
+    saveChats();
+  };
 
   // ---------- what to study ----------
   function fillPicker() {
@@ -262,8 +332,14 @@ export function initTutor(app) {
     try {
       const docs = await loadDocs(s.targets.slice(0, 4), app.sourceOf, (m) => (bot.textContent = m));
       bot.textContent = sentPhoto ? "Looking at your photo (cloud)..." : "Thinking on your laptop...";
-      const { answer, refs, source } = await chatTutor({ question: q, photo: sentPhoto, docs, history });
-      history.push({ q: q || "(photo)", a: answer });
+      const chat = current; // the reply belongs to the chat it was asked in
+      const { answer, refs, source } = await chatTutor({ question: q, photo: sentPhoto, docs, history: chat.history });
+      const used = refs.map((r) => `${docs[r.f].item.title} · slide ${r.n}`).join(", ");
+      chat.history.push({ q: q || "(photo)", a: answer, photo: !!sentPhoto, refs: used ? `Slides: ${used}` : null });
+      if (chat.title === "New chat") chat.title = (q || "Photo check").slice(0, 40);
+      if (!chat.target) chat.target = $("tutorTarget").value || "";
+      fillChatPicker();
+      saveChats();
       if (source) app.setStatus(source);
 
       bot.textContent = answer;
