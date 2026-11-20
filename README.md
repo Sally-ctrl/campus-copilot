@@ -1,4 +1,6 @@
-# Campus Copilot
+# DueHunter
+
+*Hunts the deadlines hidden in your CMS, then gets you ready for them.*
 
 A Chrome extension that reads your university portal and turns announcements into a to-do list.
 It uses **Firebase AI Logic hybrid inference**: requests run on-device with Gemini Nano when available (private, free, offline) and fall back to Gemini in the cloud otherwise.

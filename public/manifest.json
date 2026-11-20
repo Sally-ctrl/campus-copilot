@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Campus Copilot",
+  "name": "DueHunter",
   "version": "0.1.0",
   "description": "Turns your GUC CMS into a to-do list and quiz-prep assistant. Private by default with on-device Gemini Nano.",
   "permissions": [
@@ -19,6 +19,6 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "Open Campus Copilot"
+    "default_title": "Open DueHunter"
   }
 }

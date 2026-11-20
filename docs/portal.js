@@ -1,4 +1,4 @@
-// Demo University course portal: fictional data, built for judging Campus Copilot.
+// Demo University course portal: fictional data, built for judging DueHunter.
 // Pages use the same structure as a real course portal so the extension works unchanged.
 // All dates are relative to TODAY, so "Quiz 2" is always tomorrow whenever you open it.
 
