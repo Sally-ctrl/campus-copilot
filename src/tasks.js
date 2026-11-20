@@ -2,6 +2,7 @@ import { fastModel, cloudModel } from "./ai.js";
 
 // Nano's input limit is ~9k tokens; announcements are usually short.
 const MAX_CHARS = 6000;
+const NANO_MAX_CHARS = 1500; // above this, Nano starts missing things
 
 function buildPrompt(text, course, group) {
   const today = new Date().toISOString().slice(0, 10);
@@ -18,6 +19,9 @@ Reply with ONLY a JSON array. Each item:
  "type": "quiz" | "exam" | "assignment" | "project" | "other",
  "date": "YYYY-MM-DD", "time": "HH:MM" (24h, start time) or null, "details": short string or null,
  "evidence": the exact sentence from the text that gives this event's date (copy it word for word)}
+- Read EVERY sentence. An event can be mentioned only in passing, in the middle of a paragraph
+  about something else (e.g. "the last week starts on <date> and coincides with Quiz 4").
+  That still counts: use that date.
 - If an event was postponed or moved, list it ONCE with the NEW date only.
 - If a date has no year, pick the year that makes it closest to today.
 ${group ? `- The student is in tutorial group ${group}. If times or halls differ per group, use ONLY the slot for ${group} and put the hall in "details".` : ""}
@@ -40,9 +44,11 @@ export async function extractDeadlines(text, { course, group } = {}) {
 
   let source = null;
   let items = [];
+  // Long, messy announcements go straight to the cloud; short ones stay private on Nano.
+  const model = text.length > NANO_MAX_CHARS ? cloudModel : fastModel;
   try {
-    const result = await fastModel.generateContent(prompt);
-    source = result.response.inferenceSource ?? null;
+    const result = await model.generateContent(prompt);
+    source = model === cloudModel ? "in_cloud" : result.response.inferenceSource ?? null;
     items = parse(result);
   } catch (err) {
     console.warn(`${course}: first try failed`, err.message);
@@ -51,7 +57,7 @@ export async function extractDeadlines(text, { course, group } = {}) {
   // If the text clearly talks about graded work but nothing came back, ask the cloud model.
   // Also retry if everything found is already over: announcements are about what's coming.
   const allPast = items.length && items.every((it) => it.date < new Date().toISOString().slice(0, 10));
-  if ((!items.length || allPast) && LOOKS_GRADED.test(text)) {
+  if ((!items.length || allPast) && LOOKS_GRADED.test(text) && model !== cloudModel) {
     console.info(`${course}: nothing found${source ? ` (${source})` : ""}, retrying in the cloud`);
     items = parse(await cloudModel.generateContent(prompt));
     source = "in_cloud";

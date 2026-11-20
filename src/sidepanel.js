@@ -116,7 +116,7 @@ async function scanCourse(page, label = "") {
   render(); // show materials right away, before the AI answers
 
   const text = page.announcements.join("\n\n");
-  const key = `${course}|${group}|${today()}|${text}`;
+  const key = `v2|${course}|${group}|${today()}|${text}`; // bump v when extraction changes
   const cache = (await chrome.storage.local.get(AI_CACHE))[AI_CACHE] ?? {};
   let deadlines = cache[course]?.key === key ? cache[course].items : null;
   if (!deadlines) {
