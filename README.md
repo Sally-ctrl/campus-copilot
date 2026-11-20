@@ -5,12 +5,12 @@
 A Chrome extension that reads your university portal and turns announcements into a to-do list.
 It uses **Firebase AI Logic hybrid inference**: requests run on-device with Gemini Nano when available (private, free, offline) and fall back to Gemini in the cloud otherwise.
 
-## Try it in 1 minute (judges)
+## Trying it (judges)
 
-1. Download `DueHunter.zip` from the [latest release](https://github.com/Sally-ctrl/campus-copilot/releases/latest) and unzip it.
-2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick the unzipped folder.
-3. Click the DueHunter icon to open the side panel, then open the [demo portal](https://sally-ctrl.github.io/campus-copilot/).
-4. In **Settings**, set your tutorial group to `T14`, then click **Sync all courses**.
+Follow **Setup** below (about 5 minutes; you need your own Firebase project with Firebase AI Logic enabled). Then:
+
+1. Open the [demo portal](https://sally-ctrl.github.io/campus-copilot/) and the DueHunter side panel.
+2. In **Settings**, set your tutorial group to `T14`, then click **Sync all courses**.
 
 Things to try:
 - **DMA201:** Quiz 4 is hidden mid-paragraph. Open "Where it says this" under it.
@@ -21,7 +21,7 @@ Things to try:
 The demo portal is fictional and public, so no login is needed. Its dates move with today.
 If Gemini Nano isn't available on your machine, everything still works through the cloud fallback.
 
-## Build from source
+## Setup
 
 1. `npm install`
 2. Copy `src/config.example.js` to `src/config.js` and add your Firebase web config.
