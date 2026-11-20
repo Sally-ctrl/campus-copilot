@@ -137,7 +137,11 @@ function topSlides(docs, question, k = 4) {
   return scored.sort((a, b) => b.score - a.score).slice(0, k);
 }
 
+// "explain each slide", "summarize the whole lecture", "go through all slides"
+const WHOLE = /\b(each|every|all)\s+(the\s+)?slides?\b|\bslide by slide\b|\b(whole|entire|full)\s+(lecture|file|pdf)\b|\bsummari[sz]e\b/i;
+
 export async function chatTutor({ question, photo, docs, history = [] }) {
+  if (!photo && docs.length && WHOLE.test(question)) return walkThrough(question, docs[0]);
   const hits = topSlides(docs, question || "diagram");
   const context = hits
     .map((h) => `[F${h.f + 1} p${h.n}] (${docs[h.f].item.title}, slide ${h.n}): ${docs[h.f].pages[h.n - 1].text}`)
@@ -184,6 +188,20 @@ Student: ${question || "(see the photo)"}`;
   if (!refs.length && hits.length) refs = [{ f: hits[0].f, n: hits[0].n }];
   refs = refs.filter((r) => docs[r.f] && r.n >= 1 && r.n <= docs[r.f].pages.length).slice(0, 3);
   return { answer, refs, source };
+}
+
+// Goes through a whole lecture in order. Too long for Nano, so this uses the cloud.
+async function walkThrough(question, doc) {
+  const slides = doc.pages.filter((p) => p.text?.trim()).map((p) => `[slide ${p.n}] ${p.text}`).join("\n").slice(0, 14000);
+  const prompt = `You are a friendly university tutor. The student asked: "${question}"
+Go through the lecture "${doc.item.title}" slide by slide, in order. For each slide write one line:
+"Slide N: <what it teaches, in plain words>". Skip title-only slides. Then one line "Key idea:" with the main takeaway.
+Plain text only, no markdown.
+
+LECTURE:
+${slides}`;
+  const result = await cloudModel.generateContent(prompt);
+  return { answer: result.response.text().trim(), refs: [], source: "in_cloud" };
 }
 
 export { slideImage };

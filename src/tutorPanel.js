@@ -36,7 +36,8 @@ export function initTutor(app) {
     log.innerHTML = "";
     for (const m of current.history) {
       log.append(el("div", "bubble you", m.q + (m.photo ? "  📷" : "")));
-      const bot = el("div", "bubble tutor", m.a);
+      const bot = el("div", "bubble tutor", "");
+      bot.innerHTML = mdLite(m.a);
       if (m.refs) bot.append(el("div", "meta", m.refs));
       log.append(bot);
     }
@@ -301,8 +302,14 @@ export function initTutor(app) {
   async function send() {
     const q = $("askInput").value.trim();
     if (!q && !photo) return;
-    // Nothing picked? Find the 2 lectures that best match the question (titles + summaries).
+    // "lecture 9" / "DSD301" in the question wins over the picker at the top.
     let s = selected();
+    const named = mentionedFiles(q);
+    if (named.length) {
+      s = { targets: named };
+      $("chatHint").textContent = "Using: " + named.map((g) => `${g.title} (${g.course ?? ""})`).join(", ");
+    }
+    // Nothing picked? Find the 2 lectures that best match the question (titles + summaries).
     if (!s || !s.targets.length) {
       const guess = guessFiles(q);
       if (!guess.length) {
@@ -342,7 +349,7 @@ export function initTutor(app) {
       saveChats();
       if (source) app.setStatus(source);
 
-      bot.textContent = answer;
+      bot.innerHTML = mdLite(answer);
       // Show the real slides it used.
       if (refs.length) {
         const strip = el("div", "slides", "");
@@ -367,8 +374,26 @@ export function initTutor(app) {
     }
   }
 
+  // Files the question names directly: "lecture 9", "lec 7", "practice 8", optionally with a course code.
+  function mentionedFiles(question) {
+    const m = question.match(/\b(lecture|lec|practice|assignment|sheet|quiz)\s*#?\s*(\d+)/i);
+    if (!m) return [];
+    const code = question.toUpperCase().match(/\b[A-Z]{2,5}\s?\d{3}\b/)?.[0]?.replace(/\s/g, "");
+    const kindOf = (w) => (/^lec/i.test(w) ? "lecture" : /practice|assignment|sheet/i.test(w) ? "practice" : w.toLowerCase());
+    const want = kindOf(m[1]);
+    const numOf = (t) => t.match(/\b(lecture|lec|practice|assignment|sheet|quiz)\s*#?\s*(\d+)/i);
+    const files = app.items().filter((x) => {
+      const n = numOf(x.title);
+      const k = n && kindOf(n[1]);
+      return isPdf(x) && !/solution|answer/i.test(`${x.title} ${x.type}`) && n && k === want && n[2] === m[2] && (!code || x.course === code);
+    });
+    // Same number in several courses: prefer the course of what's picked at the top.
+    const pickedCourse = selected()?.holder?.course;
+    return files.sort((a, b) => (b.course === pickedCourse) - (a.course === pickedCourse)).slice(0, 1);
+  }
+
   function guessFiles(question) {
-    const qw = (question.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !/^(the|and|what|how|why|difference|between|explain|show|does|this|that|with|about)$/.test(w));
+    const qw = (question.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !/^(the|and|what|how|why|difference|between|explain|show|does|this|that|with|about|lecture|lectures|slide|slides|each|every|all|please|summarize|summary)$/.test(w));
     if (!qw.length) return [];
     return app.items()
       .filter((x) => isPdf(x) && !/solution|answer/i.test(`${x.title} ${x.type}`))
@@ -389,6 +414,8 @@ export function initTutor(app) {
     if (text) n.textContent = text;
     return n;
   }
+  // Escapes HTML, then turns **bold** and *italic* into real formatting.
+  const mdLite = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
   const norm = (s) => String(s).trim().toLowerCase().replace(/\s+/g, " ");
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   function esc(s) {
