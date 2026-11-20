@@ -299,6 +299,17 @@ function renderList(el, list, { deadline = false } = {}) {
     when.className = "when";
     when.textContent = whenLabel(it);
     body.append(title, meta, when);
+    // Shows the exact sentence the date came from, so you can trust (or check) it.
+    if (it.kind === "deadline" && it.evidence) {
+      const src = document.createElement("details");
+      src.className = "evidence";
+      const sum = document.createElement("summary");
+      sum.textContent = "Where it says this";
+      const q = document.createElement("blockquote");
+      q.textContent = it.evidence;
+      src.append(sum, q);
+      body.append(src);
+    }
     if (isPdf(it)) body.append(summaryBlock(it));
     if (it.kind === "deadline" && it.type !== "reminder" && !isPast(it)) body.append(readinessBlock(it));
 
