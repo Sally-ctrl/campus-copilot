@@ -33,7 +33,25 @@ ${text.slice(0, MAX_CHARS)}`;
 
 // AI step: announcements text -> deadline items. Returns { items, source }.
 // Every item must quote the announcement; items whose quote isn't really in the text are dropped.
-export async function extractDeadlines(text, { course, group } = {}) {
+// At most 2 AI calls at a time: more makes Nano slow and Gemini rate-limit us.
+let running = 0;
+const waiting = [];
+async function limited(fn) {
+  if (running >= 2) await new Promise((r) => waiting.push(r));
+  running++;
+  try {
+    return await fn();
+  } finally {
+    running--;
+    waiting.shift()?.();
+  }
+}
+
+export function extractDeadlines(text, opts = {}) {
+  return limited(() => extract(text, opts));
+}
+
+async function extract(text, { course, group } = {}) {
   if (!text.trim()) return { items: [], source: null };
   const prompt = buildPrompt(text, course, group);
   const parse = (result) =>
@@ -59,8 +77,12 @@ export async function extractDeadlines(text, { course, group } = {}) {
   const allPast = items.length && items.every((it) => it.date < new Date().toISOString().slice(0, 10));
   if ((!items.length || allPast) && LOOKS_GRADED.test(text) && model !== cloudModel) {
     console.info(`${course}: nothing found${source ? ` (${source})` : ""}, retrying in the cloud`);
-    items = parse(await cloudModel.generateContent(prompt));
-    source = "in_cloud";
+    try {
+      items = parse(await cloudModel.generateContent(prompt));
+      source = "in_cloud";
+    } catch (err) {
+      throw new Error("Gemini is busy right now, sync again in a minute");
+    }
   }
   return { items, source };
 }
