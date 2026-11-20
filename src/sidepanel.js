@@ -180,7 +180,7 @@ async function busy(fn) {
     await fn();
   } catch (err) {
     console.error(err);
-    $("progress").textContent = "Error: " + err.message;
+    $("syncErrors").textContent = "Error: " + err.message; // stays visible after background jobs
   } finally {
     working = false;
     await updateButtons();
@@ -215,10 +215,21 @@ $("syncBtn").addEventListener("click", () =>
     }
     // All courses at once: pages open in parallel and their AI calls run side by side.
     let added = 0, done = 0;
+    const failed = [];
+    $("syncErrors").textContent = "";
     $("progress").textContent = `Reading ${links.length} courses...`;
     await Promise.all(links.map(async (url) => {
-      const page = await readUrlInBackground(url);
-      added += await scanCourse(page, `${done}/${links.length} done · `);
+      let code = url;
+      try {
+        const page = await readUrlInBackground(url);
+        code = page.code ?? url;
+        added += await scanCourse(page, `${done}/${links.length} done · `);
+      } catch (err) {
+        // One course failing must not stop (or hide) the others.
+        console.error(code, err);
+        failed.push(`${code}: ${err.message.slice(0, 160)}`);
+        $("syncErrors").textContent = "Failed: " + failed.join(" | ");
+      }
       done++;
       $("progress").textContent = `${done}/${links.length} courses done...`;
       await save();
