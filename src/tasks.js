@@ -1,4 +1,4 @@
-import { fastModel } from "./ai.js";
+import { fastModel, cloudModel } from "./ai.js";
 
 // Nano's input limit is ~9k tokens; announcements are usually short.
 const MAX_CHARS = 6000;
@@ -31,12 +31,32 @@ ${text.slice(0, MAX_CHARS)}`;
 // Every item must quote the announcement; items whose quote isn't really in the text are dropped.
 export async function extractDeadlines(text, { course, group } = {}) {
   if (!text.trim()) return { items: [], source: null };
-  const result = await fastModel.generateContent(buildPrompt(text, course, group));
-  const items = parseJsonArray(result.response.text())
-    .map((it) => fixDate({ ...it, kind: "deadline", course }))
-    .filter((it) => it.date && !GENERIC_TITLE.test(it.title.trim()) && quotedFrom(it.evidence, text));
-  return { items, source: result.response.inferenceSource ?? null };
+  const prompt = buildPrompt(text, course, group);
+  const parse = (result) =>
+    parseJsonArray(result.response.text())
+      .map((it) => fixDate({ ...it, kind: "deadline", course }))
+      .filter((it) => it.date && !GENERIC_TITLE.test(it.title.trim()) && quotedFrom(it.evidence, text));
+
+  let source = null;
+  let items = [];
+  try {
+    const result = await fastModel.generateContent(prompt);
+    source = result.response.inferenceSource ?? null;
+    items = parse(result);
+  } catch (err) {
+    console.warn(`${course}: first try failed`, err.message);
+  }
+  // Nano is small: on long, messy announcements it can miss everything.
+  // If the text clearly talks about graded work but nothing came back, ask the cloud model.
+  if (!items.length && LOOKS_GRADED.test(text)) {
+    console.info(`${course}: nothing found${source ? ` (${source})` : ""}, retrying in the cloud`);
+    items = parse(await cloudModel.generateContent(prompt));
+    source = "in_cloud";
+  }
+  return { items, source };
 }
+
+const LOOKS_GRADED = /\b(quiz|exam|midterm|final|assignment|milestone|deadline|due|submi)/i;
 
 // "Assignment" or "Quiz" alone is too vague to be a real deadline.
 const GENERIC_TITLE = /^(assignment|quiz|exam|project|deadline|event|other)s?$/i;

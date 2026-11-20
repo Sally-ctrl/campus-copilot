@@ -124,9 +124,11 @@ async function scanCourse(page, label = "") {
     const res = await extractDeadlines(text, { course, group });
     if (res.source) setStatus(res.source);
     deadlines = res.items;
-    const fresh = (await chrome.storage.local.get(AI_CACHE))[AI_CACHE] ?? {};
-    fresh[course] = { key, items: deadlines };
-    await chrome.storage.local.set({ [AI_CACHE]: fresh });
+    if (deadlines.length) { // never cache "found nothing": it may be a model miss
+      const fresh = (await chrome.storage.local.get(AI_CACHE))[AI_CACHE] ?? {};
+      fresh[course] = { key, items: deadlines };
+      await chrome.storage.local.set({ [AI_CACHE]: fresh });
+    }
   }
 
   // Each deadline links back to its course page so it can be checked in one click.
