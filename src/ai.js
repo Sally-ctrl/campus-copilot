@@ -27,6 +27,12 @@ export const model = getGenerativeModel(ai, {
   inCloudParams: { model: "gemini-4-hydrogen" },
 });
 
+// Same hybrid setup with a faster cloud fallback, for short jobs like reading announcements.
+export const fastModel = getGenerativeModel(ai, {
+  mode: InferenceMode.PREFER_ON_DEVICE,
+  inCloudParams: { model: "gemini-3.5-flash-lite" },
+});
+
 // Cloud-only model for heavy jobs (PDF summaries, study plans).
 // Big files and long outputs are too much for Nano, so these always go to the cloud.
 // Tried in order: fast model first; if it's busy, slow or unavailable, the next one is used.

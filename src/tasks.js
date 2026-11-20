@@ -1,4 +1,4 @@
-import { model } from "./ai.js";
+import { fastModel } from "./ai.js";
 
 // Nano's input limit is ~9k tokens; announcements are usually short.
 const MAX_CHARS = 6000;
@@ -31,7 +31,7 @@ ${text.slice(0, MAX_CHARS)}`;
 // Every item must quote the announcement; items whose quote isn't really in the text are dropped.
 export async function extractDeadlines(text, { course, group } = {}) {
   if (!text.trim()) return { items: [], source: null };
-  const result = await model.generateContent(buildPrompt(text, course, group));
+  const result = await fastModel.generateContent(buildPrompt(text, course, group));
   const items = parseJsonArray(result.response.text())
     .map((it) => fixDate({ ...it, kind: "deadline", course }))
     .filter((it) => it.date && !GENERIC_TITLE.test(it.title.trim()) && quotedFrom(it.evidence, text));

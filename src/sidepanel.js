@@ -49,6 +49,7 @@ $("perDayInput").addEventListener("change", async (e) => {
 
 $("clearBtn").addEventListener("click", async () => {
   items = [];
+  await chrome.storage.local.remove("deadlineCache");
   await clearFiles();
   await save();
   render();
@@ -103,24 +104,33 @@ function merge(found) {
   return added;
 }
 
-// One course page: materials straight from the HTML, deadlines via AI.
+// One course page: materials straight from the HTML (instant), deadlines via AI.
+// AI results are cached per course: if the announcements didn't change, there's no AI call.
+const AI_CACHE = "deadlineCache";
 async function scanCourse(page, label = "") {
   if (!page.materials.length && !page.announcements.length) {
     throw new Error("This doesn't look like a CMS course page.");
   }
   const course = page.code;
-  const materials = page.materials.map((m) => ({ ...m, kind: "coursework", course }));
+  const added = merge(page.materials.map((m) => ({ ...m, kind: "coursework", course })));
+  render(); // show materials right away, before the AI answers
 
-  $("progress").textContent = `${label}Reading ${course} announcements...`;
-  const { items: deadlines, source } = await extractDeadlines(page.announcements.join("\n\n"), {
-    course,
-    group,
-  });
-  if (source) setStatus(source);
+  const text = page.announcements.join("\n\n");
+  const key = `${course}|${group}|${today()}|${text}`;
+  const cache = (await chrome.storage.local.get(AI_CACHE))[AI_CACHE] ?? {};
+  let deadlines = cache[course]?.key === key ? cache[course].items : null;
+  if (!deadlines) {
+    $("progress").textContent = `${label}Reading ${course} announcements...`;
+    const res = await extractDeadlines(text, { course, group });
+    if (res.source) setStatus(res.source);
+    deadlines = res.items;
+    const fresh = (await chrome.storage.local.get(AI_CACHE))[AI_CACHE] ?? {};
+    fresh[course] = { key, items: deadlines };
+    await chrome.storage.local.set({ [AI_CACHE]: fresh });
+  }
 
   // Each deadline links back to its course page so it can be checked in one click.
-  const linked = deadlines.map((d) => ({ ...d, link: page.url }));
-  return merge([...materials, ...linked]);
+  return added + merge(deadlines.map((d) => ({ ...d, link: page.url })));
 }
 
 // ---------- buttons ----------
@@ -201,14 +211,17 @@ $("syncBtn").addEventListener("click", () =>
       $("progress").textContent = "No courses found here. Open your CMS Courses list first.";
       return;
     }
-    let added = 0;
-    for (let i = 0; i < links.length; i++) {
-      $("progress").textContent = `Course ${i + 1}/${links.length}: opening...`;
-      const page = await readUrlInBackground(links[i]);
-      added += await scanCourse(page, `Course ${i + 1}/${links.length}: `);
+    // All courses at once: pages open in parallel and their AI calls run side by side.
+    let added = 0, done = 0;
+    $("progress").textContent = `Reading ${links.length} courses...`;
+    await Promise.all(links.map(async (url) => {
+      const page = await readUrlInBackground(url);
+      added += await scanCourse(page, `${done}/${links.length} done · `);
+      done++;
+      $("progress").textContent = `${done}/${links.length} courses done...`;
       await save();
       render();
-    }
+    }));
     $("progress").textContent = `Synced ${links.length} course(s). ${added} new item(s).`;
   }).then(prepareSummaries)
 );
