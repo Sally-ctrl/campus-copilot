@@ -58,7 +58,7 @@ const COURSES = [
       </table>
       <p>Please contact the TA assigned to your project team during the office hours listed above.</p>`,
     weeks: [
-      { desc: "Week 9", items: [item(1, "Lecture 9", "Lecture slides", F("DSD301_Lecture9_Mealy_VHDL")), item(2, "Practice Assignment 8", "Assignment ", F("DSD301_Practice8")), item(3, "Sample Quiz 2 (WS25)", "Quiz", F("DSD301_Sample_Quiz2_WS25")), item(4, "Sample Quiz 2 (WS25) Solution", "Quiz solution", F("DSD301_Sample_Quiz2_WS25_Solution"))] },
+      { desc: "Week 9", ann: `Lab Assessment 2 (FSM in VHDL) is on ${longDate(addDays(3))} in your lab slot. T13 – T15: 2nd slot, Lab C6.207. T16 – T19: 4th slot, Lab C6.208. Bring your own testbench.`, items: [item(1, "Lecture 9", "Lecture slides", F("DSD301_Lecture9_Mealy_VHDL")), item(2, "Practice Assignment 8", "Assignment ", F("DSD301_Practice8")), item(3, "Sample Quiz 2 (WS25)", "Quiz", F("DSD301_Sample_Quiz2_WS25")), item(4, "Sample Quiz 2 (WS25) Solution", "Quiz solution", F("DSD301_Sample_Quiz2_WS25_Solution"))] },
       { desc: "Week 8", items: [item(1, "Lecture 8", "Lecture slides", F("DSD301_Lecture8_FSM_Moore"), true), item(2, "Practice Assignment 7", "Assignment ", F("DSD301_Practice7"), true), item(3, "Practice Assignment 6 Solution", "Assignment solution", F("DSD301_Practice6_Solution"), true)] },
       { desc: "Week 7", items: [item(1, "Lecture 7", "Lecture slides", F("DSD301_Lecture7_Latches_FlipFlops"), true), item(2, "Practice Assignment 6", "Assignment ", F("DSD301_Practice6"), true), item(3, "Practice Assignment 7 Solution", "Assignment solution", F("DSD301_Practice7_Solution"))] },
       { desc: "Week 6", items: [item(1, "Lecture 6", "Lecture slides", F("DSD301_Lecture6"), true)] },
@@ -72,10 +72,12 @@ const COURSES = [
   {
     id: 201, code: "DMA201", name: "Discrete Mathematics",
     announcements: () => `
-      <p><strong>Quiz 3</strong> will be held on ${longDate(addDays(5))} at 11:45 in the Main Hall. It covers induction and sets.</p>
+      <p><strong>UPDATE: Quiz 3 is postponed</strong> because of the activity week. The new date is ${longDate(addDays(5))} at 11:45 in the Main Hall (it was ${shortDate(addDays(2))}). It covers Lectures 3 and 4 (induction, sets and relations).</p>
+      <p><strong>Assignment 4</strong> (sets and relations) must be submitted by ${shortDate(addDays(2))} at 23:59 on the portal. Scanned handwritten solutions are accepted.</p>
       <p>Grades of Quiz 2 are now published. Rechecking requests close next Thursday.</p>`,
     weeks: [
-      { desc: "Week 4", items: [item(1, "Lecture 4 Sets and Relations", "Lecture slides", F("DMA201_Lecture4_Sets")), item(2, "Practice Assignment 3", "Assignment ", F("DMA201_Practice3"))] },
+      { desc: "Week 5", ann: "The solution of Practice Assignment 3 is uploaded. Sample Quiz 3 from last semester is a good preparation for Quiz 3.", items: [item(1, "Lecture 5 Functions", "Lecture slides", F("DMA201_Lecture5_Functions")), item(2, "Assignment 4", "Assignment ", F("DMA201_Practice4")), item(3, "Sample Quiz 3 (WS25)", "Quiz", F("DMA201_Sample_Quiz3_WS25")), item(4, "Sample Quiz 3 (WS25) Solution", "Quiz solution", F("DMA201_Sample_Quiz3_WS25_Solution"))] },
+      { desc: "Week 4", items: [item(1, "Lecture 4 Sets and Relations", "Lecture slides", F("DMA201_Lecture4_Sets")), item(2, "Practice Assignment 3", "Assignment ", F("DMA201_Practice3"), true), item(3, "Practice Assignment 3 Solution", "Assignment solution", F("DMA201_Practice3_Solution"))] },
       { desc: "Week 3", items: [item(1, "Lecture 3 Mathematical Induction", "Lecture slides", F("DMA201_Lecture3_Induction"), true)] },
       { desc: "Week 2", items: [item(1, "Lecture 2 Proof Techniques", "Lecture slides", F("DMA201_Lecture2_Proofs"), true)] },
       { desc: "Week 1", items: [item(1, "Lecture 1 Propositional Logic", "Lecture slides", F("DMA201_Lecture1_Logic"), true)] },
@@ -85,9 +87,16 @@ const COURSES = [
     id: 126, code: "DBS301", name: "Databases I",
     announcements: () => `
       <p><strong>Project Milestone 2</strong> (SQL schema and queries) is due on ${shortDate(addDays(4))} at 23:59. Submit one file per team.</p>
+      <p><strong>Quiz 1</strong> (ER modeling and SQL, Lectures 1 and 2) will be held on ${longDate(addDays(8))} during the tutorial slots:</p>
+      <ul>
+        <li>T5 – T12: 2nd slot, C7.301</li>
+        <li>T13 – T16: 3rd slot, C7.301</li>
+        <li>T17 – T24: 4th slot, C7.302</li>
+      </ul>
       <p>Lab 5 is moved to room C3.201 this week only.</p>`,
     weeks: [
-      { desc: "Week 3", items: [item(1, "Lecture 3 Functional Dependencies", "Lecture slides", F("DBS301_Lecture3_FDs")), item(2, "Project Description", "Project", F("DBS301_Project_Description"), true)] },
+      { desc: "Week 4", ann: "Correction: Milestone 2 now requires 12 queries, not 10. The updated description is uploaded below.", items: [item(1, "Lecture 4 Normalization", "Lecture slides", F("DBS301_Lecture4_Normalization")), item(2, "Milestone 2 Description (updated)", "Project", F("DBS301_Milestone2_Description")), item(3, "Sample Quiz 1 (WS25)", "Quiz", F("DBS301_Sample_Quiz1_WS25")), item(4, "Sample Quiz 1 (WS25) Solution", "Quiz solution", F("DBS301_Sample_Quiz1_WS25_Solution"))] },
+      { desc: "Week 3", items: [item(1, "Lecture 3 Functional Dependencies", "Lecture slides", F("DBS301_Lecture3_FDs"), true), item(2, "Practice Sheet 2", "Assignment ", F("DBS301_Practice2")), item(3, "Project Description", "Project", F("DBS301_Project_Description"), true)] },
       { desc: "Week 2", items: [item(1, "Lecture 2 SQL Basics", "Lecture slides", F("DBS301_Lecture2_SQL"), true)] },
       { desc: "Week 1", items: [item(1, "Lecture 1 ER Modeling", "Lecture slides", F("DBS301_Lecture1_ER"), true)] },
     ],
@@ -95,26 +104,35 @@ const COURSES = [
   {
     id: 411, code: "NET301", name: "Introduction to Communication Networks",
     announcements: () => `
+      <p><strong>Assignment 1</strong> (subnetting) is due on ${shortDate(addDays(3))} at 23:59. Submit a single PDF through the portal.</p>
+      <p><strong>Quiz 1</strong> will be held on ${longDate(addDays(12))} at 13:30 in Exam Hall 2. It covers Lectures 1 to 3.</p>
       <p>There will be no tutorials next week because of the activity week.</p>
       <p>Lecture recordings are available on request.</p>`,
     weeks: [
-      { desc: "Week 2", items: [item(1, "Lecture 2 TCP and UDP", "Lecture slides", F("NET301_Lecture2_TCP"))] },
+      { desc: "Week 3", items: [item(1, "Lecture 3 IP Addressing and Subnetting", "Lecture slides", F("NET301_Lecture3_IP")), item(2, "Assignment 1", "Assignment ", F("NET301_Assignment1")), item(3, "Sample Quiz 1 (WS25)", "Quiz", F("NET301_Sample_Quiz1_WS25")), item(4, "Sample Quiz 1 (WS25) Solution", "Quiz solution", F("NET301_Sample_Quiz1_WS25_Solution"))] },
+      { desc: "Week 2", items: [item(1, "Lecture 2 TCP and UDP", "Lecture slides", F("NET301_Lecture2_TCP"), true)] },
       { desc: "Week 1", items: [item(1, "Lecture 1 Network Layers", "Lecture slides", F("NET301_Lecture1_Layers"), true)] },
     ],
   },
   {
     id: 127, code: "TOC301", name: "Theory of Computation",
-    announcements: () => `<p>Quiz 1 grades are published. Model answers will be discussed in the tutorials.</p>`,
+    announcements: () => `
+      <p>Quiz 1 grades are published. Model answers will be discussed in the tutorials.</p>
+      <p><strong>Quiz 2</strong> is on ${longDate(addDays(9))} in your tutorial slot. It covers Lectures 2 and 3 (regular expressions and NFAs).</p>`,
     weeks: [
-      { desc: "Week 2", items: [item(1, "Lecture 2 Regular Expressions", "Lecture slides", F("TOC301_Lecture2_Regex"))] },
+      { desc: "Week 3", ann: `Problem Set 2 is uploaded. Deadline: ${shortDate(addDays(7))} at 23:59 on the portal.`, items: [item(1, "Lecture 3 NFAs", "Lecture slides", F("TOC301_Lecture3_NFA")), item(2, "Problem Set 2", "Assignment ", F("TOC301_Problem_Set2")), item(3, "Sample Quiz 2 (WS25)", "Quiz", F("TOC301_Sample_Quiz2_WS25")), item(4, "Sample Quiz 2 (WS25) Solution", "Quiz solution", F("TOC301_Sample_Quiz2_WS25_Solution"))] },
+      { desc: "Week 2", items: [item(1, "Lecture 2 Regular Expressions", "Lecture slides", F("TOC301_Lecture2_Regex"), true)] },
       { desc: "Week 1", items: [item(1, "Lecture 1 Finite Automata", "Lecture slides", F("TOC301_Lecture1_DFA"), true)] },
     ],
   },
   {
     id: 125, code: "MED301", name: "Introduction to Media Engineering",
-    announcements: () => `<p><strong>Assignment 2</strong> (toy creature) is due on ${shortDate(addDays(10))} at 23:59.</p>`,
+    announcements: () => `
+      <p><strong>Assignment 2</strong> (toy creature) is due on ${shortDate(addDays(10))} at 23:59.</p>
+      <p><strong>Assignment 3</strong> (textured scene) is released. It builds on Assignment 2 and is due on ${shortDate(addDays(21))} at 23:59.</p>`,
     weeks: [
-      { desc: "Week 2", items: [item(1, "Assignment 2", "Assignment ", F("MED301_Assignment2"))] },
+      { desc: "Week 3", items: [item(1, "Lecture 2 Materials, Texturing and Lighting", "Lecture slides", F("MED301_Lecture2_Texturing")), item(2, "Assignment 3", "Assignment ", F("MED301_Assignment3"))] },
+      { desc: "Week 2", items: [item(1, "Assignment 2", "Assignment ", F("MED301_Assignment2"), true)] },
       { desc: "Week 1", items: [item(1, "Lecture 1 3D Modeling Basics", "Lecture slides", F("MED301_Lecture1_3D"), true)] },
     ],
   },
@@ -152,7 +170,7 @@ function renderCourse(el, id) {
       <div class="card weeksdata">
         <div class="card-header"><h2>Week: ${weekStart(wi)}</h2></div>
         <div class="p-3">
-          <div style="display:none"><div><strong>Announcement</strong></div><p class="m-2 p2"></p></div>
+          <div${w.ann ? "" : ' style="display:none"'}><div><strong>Announcement</strong></div><p class="m-2 p2 ann">${w.ann ? esc(w.ann) : ""}</p></div>
           <div><div><strong>Description</strong></div><p class="m-2 p2">${esc(w.desc)}</p></div>
           <div><strong>Content</strong>
             ${w.items.map((i) => `

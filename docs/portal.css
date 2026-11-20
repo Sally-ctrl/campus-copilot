@@ -25,3 +25,4 @@ table.courses th, table.courses td { border: 1px solid #e3e6ec; padding: 10px; t
 table.oh { border-collapse: collapse; } table.oh td, table.oh th { border: 1px solid #ddd; padding: 4px 10px; }
 .hint { font-weight: bold; color: #555; }
 footer { text-align: center; color: #888; font-size: 12px; padding: 24px; }
+.ann { background: #fff4f4; border-left: 3px solid #c0392b; padding: 6px 10px; }

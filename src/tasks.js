@@ -18,6 +18,7 @@ Reply with ONLY a JSON array. Each item:
  "type": "quiz" | "exam" | "assignment" | "project" | "other",
  "date": "YYYY-MM-DD", "time": "HH:MM" (24h, start time) or null, "details": short string or null,
  "evidence": the exact sentence from the text that gives this event's date (copy it word for word)}
+- If an event was postponed or moved, list it ONCE with the NEW date only.
 - If a date has no year, pick the year that makes it closest to today.
 ${group ? `- The student is in tutorial group ${group}. If times or halls differ per group, use ONLY the slot for ${group} and put the hall in "details".` : ""}
 - If nothing qualifies, reply [].
