@@ -35,7 +35,8 @@ export async function extractDeadlines(text, { course, group } = {}) {
   const parse = (result) =>
     parseJsonArray(result.response.text())
       .map((it) => fixDate({ ...it, kind: "deadline", course }))
-      .filter((it) => it.date && !GENERIC_TITLE.test(it.title.trim()) && quotedFrom(it.evidence, text));
+      .filter((it) => it.date && !GENERIC_TITLE.test(it.title.trim()) && quotedFrom(it.evidence, text))
+      .map(fixYear);
 
   let source = null;
   let items = [];
@@ -48,7 +49,9 @@ export async function extractDeadlines(text, { course, group } = {}) {
   }
   // Nano is small: on long, messy announcements it can miss everything.
   // If the text clearly talks about graded work but nothing came back, ask the cloud model.
-  if (!items.length && LOOKS_GRADED.test(text)) {
+  // Also retry if everything found is already over: announcements are about what's coming.
+  const allPast = items.length && items.every((it) => it.date < new Date().toISOString().slice(0, 10));
+  if ((!items.length || allPast) && LOOKS_GRADED.test(text)) {
     console.info(`${course}: nothing found${source ? ` (${source})` : ""}, retrying in the cloud`);
     items = parse(await cloudModel.generateContent(prompt));
     source = "in_cloud";
@@ -68,6 +71,23 @@ function quotedFrom(evidence, text) {
   if (quote.length < 2) return false;
   const source = new Set(words(text));
   return quote.filter((w) => source.has(w)).length / quote.length >= 0.7;
+}
+
+// Small models sometimes get the year wrong ("2025-11-25" in November 2026).
+// If the date is months in the past but the same day this/next year is near, use that.
+function fixYear(it) {
+  const DAY = 86400000;
+  const now = new Date(new Date().toISOString().slice(0, 10));
+  const d = new Date(it.date);
+  if (now - d < 60 * DAY) return it;
+  for (const y of [now.getFullYear(), now.getFullYear() + 1]) {
+    const c = new Date(`${y}${it.date.slice(4)}`);
+    if (Math.abs(c - now) < 120 * DAY) {
+      it.date = `${y}${it.date.slice(4)}`;
+      return it;
+    }
+  }
+  return it;
 }
 
 // Models sometimes write "2026-11-7" instead of "2026-11-07".

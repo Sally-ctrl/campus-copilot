@@ -191,6 +191,11 @@ $("readBtn").addEventListener("click", () =>
   busy(async () => {
     startNano();
     const page = await readTab((await activeTab()).id);
+    if (!page.materials.length && !page.announcements.length) {
+      // On the Courses list there's nothing to scan, so sync every course instead.
+      $("progress").textContent = "This is your Courses list, so syncing all courses...";
+      return syncAll();
+    }
     const added = await scanCourse(page);
     await save();
     render();
@@ -201,6 +206,11 @@ $("readBtn").addEventListener("click", () =>
 $("syncBtn").addEventListener("click", () =>
   busy(async () => {
     startNano();
+    await syncAll();
+  }).then(prepareSummaries)
+);
+
+async function syncAll() {
     const tab = await activeTab();
     // Collect every "View Course" link on the current page.
     const [{ result: links }] = await chrome.scripting.executeScript({
@@ -236,8 +246,7 @@ $("syncBtn").addEventListener("click", () =>
       render();
     }));
     $("progress").textContent = `Synced ${links.length} course(s). ${added} new item(s).`;
-  }).then(prepareSummaries)
-);
+}
 
 // ---------- UI ----------
 function setStatus(source) {
