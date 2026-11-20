@@ -70,6 +70,7 @@ async function extract(text, { course, group } = {}) {
     items = parse(result);
   } catch (err) {
     console.warn(`${course}: first try failed`, err.message);
+    if (model === cloudModel) throw new Error("Gemini is busy right now, sync again in a minute");
   }
   // Nano is small: on long, messy announcements it can miss everything.
   // If the text clearly talks about graded work but nothing came back, ask the cloud model.
